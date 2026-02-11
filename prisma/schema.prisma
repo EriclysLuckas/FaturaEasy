@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+//SCHEMA CARTÃO DE USUÁRIO
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cardsOwned     CreditCard[]     @relation("CardOwner")
+  cardLinks      CreditCardUser[]
+  purchases      Purchase[]
+}
+
+//SCHEMA CARTÃO DE CREDITO
+model CreditCard {
+  id              String   @id @default(uuid())
+  name            String
+  totalLimit      Decimal
+  dueDay          Int
+  ownerId         String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  owner           User              @relation("CardOwner", fields: [ownerId], references: [id])
+  users           CreditCardUser[]
+  purchases       Purchase[]
+}
+//SCHEMA CARTÃO <> USUÁRIO
+
+model CreditCardUser {
+  id             String   @id @default(uuid())
+  userId         String
+  creditCardId   String
+  limitGranted   Decimal
+  createdAt      DateTime @default(now())
+
+  user           User        @relation(fields: [userId], references: [id])
+  creditCard     CreditCard  @relation(fields: [creditCardId], references: [id])
+
+  @@unique([userId, creditCardId])
+}
+
+
+
+//SCHEMA COMPRAS
+model Purchase {
+  id             String   @id @default(uuid())
+  description    String
+  amount         Decimal
+  installments   Int
+  purchaseDate   DateTime
+  userId         String
+  creditCardId   String
+  createdAt      DateTime @default(now())
+
+  user           User        @relation(fields: [userId], references: [id])
+  creditCard     CreditCard  @relation(fields: [creditCardId], references: [id])
+}
