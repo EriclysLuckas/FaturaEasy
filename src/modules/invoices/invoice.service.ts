@@ -1,5 +1,14 @@
 import { prisma } from "../../infra/database/prisma.js";
 import { PermissionService } from "../permissions/permissions.service.js";
+import { getInvoicePeriod } from "../../shared/utils/invoice-period.js";
+import { Purchase } from "@prisma/client";
+
+interface GetInvoiceInput {
+  userId: string;
+  creditCardId: string;
+  month: number; // mês de vencimento
+  year: number;
+}
 
 export class InvoiceService {
   private permissionService = new PermissionService();
@@ -9,41 +18,43 @@ export class InvoiceService {
     creditCardId,
     month,
     year,
-  }: {
-    userId: string;
-    creditCardId: string;
-    month: number;
-    year: number;
-  }) {
-    //  Permissão
+  }: GetInvoiceInput) {
+    // 🔐 1. Verificação de permissão
     const isOwner = await this.permissionService.isCardOwner(
       userId,
       creditCardId
     );
 
-    const cardUser = await this.permissionService.isCardUser(
+    const isCardUser = await this.permissionService.isCardUser(
       userId,
       creditCardId
     );
 
-    if (!isOwner && !cardUser) {
+    if (!isOwner && !isCardUser) {
       throw new Error("Access denied");
     }
 
-    //  Descobre período da fatura
     const card = await prisma.creditCard.findUnique({
       where: { id: creditCardId },
+      select: {
+        id: true,
+        name: true,
+        dueDay: true,
+        totalLimit: true,
+      },
     });
 
     if (!card) {
       throw new Error("Card not found");
     }
 
-    const startDate = new Date(year, month - 1, card.dueDay + 1);
-    const endDate = new Date(year, month, card.dueDay);
+    const { startDate, endDate } = getInvoicePeriod(
+      year,
+      month,
+      card.dueDay
+    );
 
-    //  Busca compras
-    const purchases = await prisma.purchase.findMany({
+    const purchases: Purchase[] = await prisma.purchase.findMany({
       where: {
         creditCardId,
         purchaseDate: {
@@ -52,20 +63,50 @@ export class InvoiceService {
         },
         ...(isOwner ? {} : { userId }),
       },
+      orderBy: {
+        purchaseDate: "asc",
+      },
     });
 
-    //  Total
-    const total = purchases.reduce(
+    const total = purchases.reduce<number>(
       (sum, purchase) => sum + Number(purchase.amount),
       0
     );
 
+    let totalsByUser: Record<string, number> | null = null;
+
+    if (isOwner) {
+      totalsByUser = purchases.reduce<Record<string, number>>(
+        (acc, purchase) => {
+          const key = purchase.userId;
+
+          if (!acc[key]) {
+            acc[key] = 0;
+          }
+
+          acc[key] += Number(purchase.amount);
+          return acc;
+        },
+        {}
+      );
+    }
+
     return {
+      card: {
+        id: card.id,
+        name: card.name,
+        totalLimit: Number(card.totalLimit),
+        dueDay: card.dueDay,
+      },
+      invoicePeriod: {
+        startDate,
+        endDate,
+      },
       month,
       year,
       total,
       purchases,
+      totalsByUser,
     };
   }
 }
- 

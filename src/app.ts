@@ -1,3 +1,12 @@
-import Fastify from 'fastify'
+import Fastify from "fastify";
+import cors from "@fastify/cors";
 
-export const app = Fastify()
+import { healthRoutes } from "./routes/health.routes.js";
+
+export const app = Fastify({
+  logger: true,
+});
+
+app.register(cors);
+
+app.register(healthRoutes);
