@@ -1,25 +1,43 @@
-import { FastifyReply, FastifyRequest } from "fastify";
-import { AuthService } from "./auth.services.js";
-import { loginSchema, registerSchema } from "./auth.schema.js";
+import { FastifyReply, FastifyRequest } from 'fastify'
+
+import { AuthService } from './auth.service.js'
+
+import {
+  loginSchema,
+  registerSchema,
+} from './auth.schema.js'
+
+const authService = new AuthService()
 
 export class AuthController {
-  private authService = new AuthService();
+  async register(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) {
+    const body = registerSchema.parse(request.body)
 
-  async register(request: FastifyRequest, reply: FastifyReply) {
-    const data = registerSchema.parse(request.body);
-    const user = await this.authService.register(
-      data.name,
-      data.email,
-      data.password
-    );
+    const user = await authService.register(body)
 
-    return reply.status(201).send(user);
+    return reply.status(201).send(user)
   }
 
-  async login(request: FastifyRequest, reply: FastifyReply) {
-    const data = loginSchema.parse(request.body);
-    const result = await this.authService.login(data.email, data.password);
+  async login(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) {
+    const body = loginSchema.parse(request.body)
 
-    return reply.send(result);
+    const user = await authService.login(body)
+
+    const token = await reply.jwtSign(
+        { 
+         sub: user.id,
+        },
+     
+    )
+
+    return reply.send({
+      token,
+    })
   }
 }

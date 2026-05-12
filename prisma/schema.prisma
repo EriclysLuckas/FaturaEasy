@@ -4,66 +4,129 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url= env ("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
-//SCHEMA CARTÃO DE USUÁRIO
+enum PurchaseInstallmentStatus {
+  PENDING
+  PAID
+  CANCELED
+}
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
+  id       String @id @default(uuid())
+  name     String
+  email    String @unique
+  password String
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  cardsOwned     CreditCard[]     @relation("CardOwner")
-  cardLinks      CreditCardUser[]
-  purchases      Purchase[]
+  cardsOwned CreditCard[] @relation("CardOwner")
+
+  cardLinks CreditCardUser[]
+
+  purchases Purchase[]
+
+  purchaseInstallments PurchaseInstallment[]
 }
 
-//SCHEMA CARTÃO DE CREDITO
 model CreditCard {
-  id              String   @id @default(uuid())
-  name            String
-  totalLimit      Decimal
-  dueDay          Int
-  ownerId         String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id String @id @default(uuid())
 
-  owner           User              @relation("CardOwner", fields: [ownerId], references: [id])
-  users           CreditCardUser[]
-  purchases       Purchase[]
+  name String
+
+  totalLimit Decimal
+
+  closingDay Int
+
+  dueDay Int
+
+  ownerId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  owner User @relation("CardOwner", fields: [ownerId], references: [id])
+
+  users CreditCardUser[]
+
+  purchases Purchase[]
 }
-//SCHEMA CARTÃO <> USUÁRIO
 
 model CreditCardUser {
-  id             String   @id @default(uuid())
-  userId         String
-  creditCardId   String
-  limitGranted   Decimal
-  createdAt      DateTime @default(now())
+  id String @id @default(uuid())
 
-  user           User        @relation(fields: [userId], references: [id])
-  creditCard     CreditCard  @relation(fields: [creditCardId], references: [id])
+  userId String
+
+  creditCardId String
+
+  limitGranted Decimal
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  creditCard CreditCard @relation(fields: [creditCardId], references: [id])
 
   @@unique([userId, creditCardId])
+  @@index([userId])
+  @@index([creditCardId])
 }
 
-
-
-//SCHEMA COMPRAS
 model Purchase {
-  id             String   @id @default(uuid())
-  description    String
-  amount         Decimal
-  installments   Int
-  purchaseDate   DateTime
-  userId         String
-  creditCardId   String
-  createdAt      DateTime @default(now())
+  id String @id @default(uuid())
 
-  user           User        @relation(fields: [userId], references: [id])
-  creditCard     CreditCard  @relation(fields: [creditCardId], references: [id])
+  description String
+
+  amount Decimal
+
+  installments Int
+
+  purchaseDate DateTime
+
+  userId String
+
+  creditCardId String
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  creditCard CreditCard @relation(fields: [creditCardId], references: [id])
+
+  installmentsData PurchaseInstallment[]
+
+  @@index([userId])
+  @@index([creditCardId])
+  @@index([purchaseDate])
+}
+
+model PurchaseInstallment {
+  id String @id @default(uuid())
+
+  purchaseId String
+
+  userId String
+
+  installmentNumber Int
+
+  amount Decimal
+
+  competenceMonth Int
+
+  competenceYear Int
+
+  status PurchaseInstallmentStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id])
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([purchaseId])
+  @@index([competenceMonth, competenceYear])
+  @@index([status])
 }

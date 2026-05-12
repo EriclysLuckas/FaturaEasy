@@ -5,7 +5,7 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "tsx watch src/server.ts",
+    "dev": "tsx watch  src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "prisma:generate": "prisma generate",
@@ -15,7 +15,7 @@
   },
   "dependencies": {
     "@fastify/cors": "^9.0.0",
-    "@fastify/jwt": "^7.0.0",
+    "@fastify/jwt": "^7.2.4",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^16.4.5",

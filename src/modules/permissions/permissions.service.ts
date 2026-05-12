@@ -1,23 +1,36 @@
-import { prisma } from "../../infra/database/prisma.js";
+import { prisma } from '../../infra/database/prisma.js'
 
 export class PermissionService {
-  async isCardOwner(userId: string, cardId: string) {
+  async isCardOwner(
+    userId: string,
+    creditCardId: string
+  ) {
     const card = await prisma.creditCard.findUnique({
-      where: { id: cardId },
-      select: { ownerId: true },
-    });
+      where: {
+        id: creditCardId,
+      },
+    })
 
-    return card?.ownerId === userId;
+    if (!card) {
+      return false
+    }
+
+    return card.ownerId === userId
   }
-
-  async isCardUser(userId: string, cardId: string) {
-    return prisma.creditCardUser.findUnique({
+  async isCardUser(
+  userId: string,
+  creditCardId: string
+) {
+  const link =
+    await prisma.creditCardUser.findUnique({
       where: {
         userId_creditCardId: {
           userId,
-          creditCardId: cardId,
+          creditCardId,
         },
       },
-    });
-  }
+    })
+
+  return !!link
+}
 }
