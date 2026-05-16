@@ -60,16 +60,19 @@ export class PurchaseService {
     }
 
     // calcula limite já utilizado
-    const pendingInstallments =
-      await prisma.purchaseInstallment.findMany(
-        {
-          where: {
-            userId: data.userId,
+   const pendingInstallments =
+  await prisma.purchaseInstallment.findMany({
+    where: {
+      userId: data.userId,
 
-            status: 'PENDING',
-          },
-        }
-      )
+      status: 'PENDING',
+
+      purchase: {
+        creditCardId:
+          data.creditCardId,
+      },
+    },
+  })
 
     const usedLimit =
       pendingInstallments.reduce(
