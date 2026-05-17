@@ -5,9 +5,9 @@ import {
   FastifyRequest,
 } from 'fastify'
 
-import { PaymentService } from './payment.service.js'
+import { z } from 'zod'
 
-import { payInvoiceParamsSchema } from './payment.schema.js'
+import { PaymentService } from './payment.service.js'
 
 const paymentService =
   new PaymentService()
@@ -17,22 +17,21 @@ export class PaymentController {
     request: FastifyRequest,
     reply: FastifyReply
   ) {
-    const params =
-      payInvoiceParamsSchema.parse(
-        request.params
-      )
+    const params = z
+      .object({
+        invoiceId: z.string().uuid(),
+      })
+      .parse(request.params)
 
     const result =
       await paymentService.payInvoice({
-        userId: request.user.sub,
+        invoiceId: params.invoiceId,
 
-        creditCardId: params.cardId,
-
-        month: params.month,
-
-        year: params.year,
+        userId: String(
+          request.user.sub
+        ),
       })
 
-    return reply.status(200).send(result)
+    return reply.send(result)
   }
 }

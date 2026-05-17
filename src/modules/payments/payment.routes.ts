@@ -13,12 +13,10 @@ export async function paymentRoutes(
   app: FastifyInstance
 ) {
   app.post(
-    '/cards/:cardId/invoices/:year/:month/pay',
-
+    '/invoices/:invoiceId/pay',
     {
       preHandler: [authMiddleware],
     },
-
     paymentController.payInvoice
   )
 }

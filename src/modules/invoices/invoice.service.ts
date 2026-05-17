@@ -4,6 +4,8 @@ import { prisma } from '../../infra/database/prisma.js'
 
 import { PermissionService } from '../permissions/permissions.service.js'
 
+import { InvoiceEngineService } from './invoice-engine.service.js'
+
 interface GetInvoiceInput {
   userId: string
   creditCardId: string
@@ -14,6 +16,9 @@ interface GetInvoiceInput {
 export class InvoiceService {
   private permissionService =
     new PermissionService()
+
+  private invoiceEngine =
+    new InvoiceEngineService()
 
   async getInvoice({
     userId,
@@ -38,7 +43,29 @@ export class InvoiceService {
       throw new Error('Access denied')
     }
 
+    //
+    // 🔥 GARANTE INVOICE PERSISTIDA
+    //
+
+    const invoice =
+      await this.invoiceEngine.ensureInvoiceExists(
+        creditCardId,
+        month,
+        year
+      )
+
+    //
+    // 🔥 AUTO CLOSE ENGINE
+    //
+
+    await this.invoiceEngine.autoCloseInvoice(
+      invoice.id
+    )
+
+    //
     // 💳 busca cartão
+    //
+
     const card =
       await prisma.creditCard.findUnique({
         where: {
@@ -58,7 +85,10 @@ export class InvoiceService {
       throw new Error('Card not found')
     }
 
+    //
     // 📦 busca parcelas da competência
+    //
+
     const installments =
       await prisma.purchaseInstallment.findMany(
         {
@@ -112,7 +142,10 @@ export class InvoiceService {
         }
       )
 
+    //
     // 💰 total da invoice
+    //
+
     const total =
       installments.reduce(
         (acc, installment) =>
@@ -121,7 +154,10 @@ export class InvoiceService {
         0
       )
 
+    //
     // 👥 total por usuário
+    //
+
     let totalsByUser: Record<
       string,
       {
@@ -168,8 +204,25 @@ export class InvoiceService {
         )
     }
 
-    // 📄 retorno da invoice dinâmica
+    //
+    // 📄 retorno invoice dinâmica
+    //
+
     return {
+      invoice: {
+        id: invoice.id,
+
+        status: invoice.status,
+
+        totalAmount: Number(
+          invoice.totalAmount
+        ),
+
+        closedAt: invoice.closedAt,
+
+        paidAt: invoice.paidAt,
+      },
+
       card: {
         id: card.id,
 

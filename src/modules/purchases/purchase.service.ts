@@ -38,7 +38,7 @@ export class PurchaseService {
       )
     }
 
-    // busca vínculo do usuário com cartão
+    // busca vínculo usuário/cartão
     const cardLink =
       await prisma.creditCardUser.findUnique(
         {
@@ -59,40 +59,6 @@ export class PurchaseService {
       )
     }
 
-    // calcula limite já utilizado
-   const pendingInstallments =
-  await prisma.purchaseInstallment.findMany({
-    where: {
-      userId: data.userId,
-
-      status: 'PENDING',
-
-      purchase: {
-        creditCardId:
-          data.creditCardId,
-      },
-    },
-  })
-
-    const usedLimit =
-      pendingInstallments.reduce(
-        (acc, installment) =>
-          acc +
-          Number(installment.amount),
-        0
-      )
-
-    const availableLimit =
-      Number(cardLink.limitGranted) -
-      usedLimit
-
-    // valida limite disponível
-    if (data.amount > availableLimit) {
-      throw new Error(
-        'Insufficient limit'
-      )
-    }
-
     // busca cartão
     const card =
       await prisma.creditCard.findUnique({
@@ -107,7 +73,94 @@ export class PurchaseService {
       )
     }
 
-    // calcula competência inicial
+    //
+    // 🔹 LIMITE INDIVIDUAL DO USUÁRIO
+    //
+
+    const userPendingInstallments =
+      await prisma.purchaseInstallment.findMany(
+        {
+          where: {
+            userId: data.userId,
+
+            status: 'PENDING',
+
+            purchase: {
+              creditCardId:
+                data.creditCardId,
+            },
+          },
+        }
+      )
+
+    const userUsedLimit =
+      userPendingInstallments.reduce(
+        (acc, installment) =>
+          acc +
+          Number(installment.amount),
+        0
+      )
+
+    const userAvailableLimit =
+      Number(cardLink.limitGranted) -
+      userUsedLimit
+
+    //
+    // 🔹 LIMITE GLOBAL DO CARTÃO
+    //
+
+    const cardPendingInstallments =
+      await prisma.purchaseInstallment.findMany(
+        {
+          where: {
+            status: 'PENDING',
+
+            purchase: {
+              creditCardId:
+                data.creditCardId,
+            },
+          },
+        }
+      )
+
+    const cardUsedLimit =
+      cardPendingInstallments.reduce(
+        (acc, installment) =>
+          acc +
+          Number(installment.amount),
+        0
+      )
+
+    const cardAvailableLimit =
+      Number(card.totalLimit) -
+      cardUsedLimit
+
+    //
+    // 🔹 VALIDAÇÕES
+    //
+
+    if (
+      data.amount >
+      userAvailableLimit
+    ) {
+      throw new Error(
+        'User limit exceeded'
+      )
+    }
+
+    if (
+      data.amount >
+      cardAvailableLimit
+    ) {
+      throw new Error(
+        'Card has insufficient limit'
+      )
+    }
+
+    //
+    // 🔹 COMPETÊNCIA FINANCEIRA
+    //
+
     const purchaseDay =
       data.purchaseDate.getDate()
 
@@ -117,7 +170,8 @@ export class PurchaseService {
     let competenceYear =
       data.purchaseDate.getFullYear()
 
-    // compra após fechamento entra na próxima competência
+    // compra após fechamento
+    // entra na próxima competência
     if (
       purchaseDay > card.closingDay
     ) {
@@ -130,7 +184,10 @@ export class PurchaseService {
       }
     }
 
-    // distribuição financeira correta
+    //
+    // 🔹 DISTRIBUIÇÃO FINANCEIRA
+    //
+
     const baseInstallment =
       Math.floor(
         (data.amount /
@@ -147,6 +204,10 @@ export class PurchaseService {
         data.amount - totalBase
       ).toFixed(2)
     )
+
+    //
+    // 🔹 TRANSACTION
+    //
 
     return prisma.$transaction(
       async (tx) => {

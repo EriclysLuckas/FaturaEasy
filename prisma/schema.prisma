@@ -13,6 +13,12 @@ enum PurchaseInstallmentStatus {
   CANCELED
 }
 
+enum InvoiceStatus {
+  OPEN
+  CLOSED
+  PAID
+}
+
 model User {
   id       String @id @default(uuid())
   name     String
@@ -52,6 +58,8 @@ model CreditCard {
   users CreditCardUser[]
 
   purchases Purchase[]
+
+  invoices Invoice[]
 }
 
 model CreditCardUser {
@@ -70,7 +78,9 @@ model CreditCardUser {
   creditCard CreditCard @relation(fields: [creditCardId], references: [id])
 
   @@unique([userId, creditCardId])
+
   @@index([userId])
+
   @@index([creditCardId])
 }
 
@@ -98,7 +108,9 @@ model Purchase {
   installmentsData PurchaseInstallment[]
 
   @@index([userId])
+
   @@index([creditCardId])
+
   @@index([purchaseDate])
 }
 
@@ -126,7 +138,44 @@ model PurchaseInstallment {
   user User @relation(fields: [userId], references: [id])
 
   @@index([userId])
+
   @@index([purchaseId])
+
   @@index([competenceMonth, competenceYear])
+
+  @@index([status])
+}
+
+model Invoice {
+  id String @id @default(uuid())
+
+  creditCardId String
+
+  month Int
+
+  year Int
+
+  status InvoiceStatus @default(OPEN)
+
+  totalAmount Decimal @default(0)
+
+  openedAt DateTime @default(now())
+
+  closedAt DateTime?
+
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  creditCard CreditCard @relation(fields: [creditCardId], references: [id])
+
+  @@unique([creditCardId, month, year])
+
+  @@index([creditCardId])
+
+  @@index([month, year])
+
   @@index([status])
 }

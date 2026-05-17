@@ -5,10 +5,8 @@ import { prisma } from '../../infra/database/prisma.js'
 import { PermissionService } from '../permissions/permissions.service.js'
 
 interface PayInvoiceInput {
+  invoiceId: string
   userId: string
-  creditCardId: string
-  month: number
-  year: number
 }
 
 export class PaymentService {
@@ -16,16 +14,28 @@ export class PaymentService {
     new PermissionService()
 
   async payInvoice({
+    invoiceId,
     userId,
-    creditCardId,
-    month,
-    year,
   }: PayInvoiceInput) {
-    // 🔐 Apenas owner pode pagar invoice
+    // busca invoice
+    const invoice =
+      await prisma.invoice.findUnique({
+        where: {
+          id: invoiceId,
+        },
+      })
+
+    if (!invoice) {
+      throw new Error(
+        'Invoice not found'
+      )
+    }
+
+    // valida owner
     const isOwner =
       await this.permissionService.isCardOwner(
         userId,
-        creditCardId
+        invoice.creditCardId
       )
 
     if (!isOwner) {
@@ -34,75 +44,55 @@ export class PaymentService {
       )
     }
 
-    // Busca parcelas pendentes da competência
-    const installments =
-      await prisma.purchaseInstallment.findMany({
-        where: {
-          purchase: {
-            creditCardId,
-          },
-
-          competenceMonth: month,
-
-          competenceYear: year,
-
-          status: 'PENDING',
-        },
-
-        select: {
-          id: true,
-          amount: true,
-        },
-      })
-
-    // Valida invoice
-    if (installments.length === 0) {
+    // valida status
+    if (invoice.status === 'PAID') {
       throw new Error(
-        'No pending installments for this invoice'
+        'Invoice already paid'
       )
     }
 
-    // Soma total pago
-    const totalPaid =
-      installments.reduce(
-        (sum, installment) =>
-          sum + Number(installment.amount),
-        0
-      )
+    return prisma.$transaction(
+      async (tx) => {
+        // marca parcelas da competência
+        await tx.purchaseInstallment.updateMany(
+          {
+            where: {
+              competenceMonth:
+                invoice.month,
 
-    // Transaction financeira
-    await prisma.$transaction(async (tx) => {
-      await tx.purchaseInstallment.updateMany({
-        where: {
-          id: {
-            in: installments.map(
-              (installment) =>
-                installment.id
-            ),
-          },
-        },
+              competenceYear:
+                invoice.year,
 
-        data: {
-          status: 'PAID',
-        },
-      })
-    })
+              status: 'PENDING',
 
-    return {
-      success: true,
+              purchase: {
+                creditCardId:
+                  invoice.creditCardId,
+              },
+            },
 
-      message:
-        'Invoice paid successfully',
+            data: {
+              status: 'PAID',
+            },
+          }
+        )
 
-      totalPaid,
+        // atualiza invoice
+        const updatedInvoice =
+          await tx.invoice.update({
+            where: {
+              id: invoice.id,
+            },
 
-      paidInstallments:
-        installments.length,
+            data: {
+              status: 'PAID',
 
-      competence: {
-        month,
-        year,
-      },
-    }
+              paidAt: new Date(),
+            },
+          })
+
+        return updatedInvoice
+      }
+    )
   }
 }
