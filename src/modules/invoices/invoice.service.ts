@@ -1,17 +1,19 @@
-import { prisma } from "../../infra/database/prisma.js";
-import { PermissionService } from "../permissions/permissions.service.js";
-import { getInvoicePeriod } from "../../shared/utils/invoice-period.js";
-import { Purchase } from "@prisma/client";
+// src/modules/invoices/invoice.service.ts
+
+import { prisma } from '../../infra/database/prisma.js'
+
+import { PermissionService } from '../permissions/permissions.service.js'
 
 interface GetInvoiceInput {
-  userId: string;
-  creditCardId: string;
-  month: number; // mês de vencimento
-  year: number;
+  userId: string
+  creditCardId: string
+  month: number
+  year: number
 }
 
 export class InvoiceService {
-  private permissionService = new PermissionService();
+  private permissionService =
+    new PermissionService()
 
   async getInvoice({
     userId,
@@ -19,94 +21,215 @@ export class InvoiceService {
     month,
     year,
   }: GetInvoiceInput) {
-    // 🔐 1. Verificação de permissão
-    const isOwner = await this.permissionService.isCardOwner(
-      userId,
-      creditCardId
-    );
+    // 🔐 valida permissões
+    const isOwner =
+      await this.permissionService.isCardOwner(
+        userId,
+        creditCardId
+      )
 
-    const isCardUser = await this.permissionService.isCardUser(
-      userId,
-      creditCardId
-    );
+    const isCardUser =
+      await this.permissionService.isCardUser(
+        userId,
+        creditCardId
+      )
 
     if (!isOwner && !isCardUser) {
-      throw new Error("Access denied");
+      throw new Error('Access denied')
     }
 
-    const card = await prisma.creditCard.findUnique({
-      where: { id: creditCardId },
-      select: {
-        id: true,
-        name: true,
-        dueDay: true,
-        totalLimit: true,
-      },
-    });
+    // 💳 busca cartão
+    const card =
+      await prisma.creditCard.findUnique({
+        where: {
+          id: creditCardId,
+        },
+
+        select: {
+          id: true,
+          name: true,
+          totalLimit: true,
+          closingDay: true,
+          dueDay: true,
+        },
+      })
 
     if (!card) {
-      throw new Error("Card not found");
+      throw new Error('Card not found')
     }
 
-    const { startDate, endDate } = getInvoicePeriod(
-      year,
-      month,
-      card.dueDay
-    );
+    // 📦 busca parcelas da competência
+    const installments =
+      await prisma.purchaseInstallment.findMany(
+        {
+          where: {
+            competenceMonth: month,
 
-    const purchases: Purchase[] = await prisma.purchase.findMany({
-      where: {
-        creditCardId,
-        purchaseDate: {
-          gte: startDate,
-          lte: endDate,
-        },
-        ...(isOwner ? {} : { userId }),
-      },
-      orderBy: {
-        purchaseDate: "asc",
-      },
-    });
+            competenceYear: year,
 
-    const total = purchases.reduce<number>(
-      (sum, purchase) => sum + Number(purchase.amount),
-      0
-    );
+            status: 'PENDING',
 
-    let totalsByUser: Record<string, number> | null = null;
+            purchase: {
+              creditCardId,
+            },
 
+            // usuário secundário vê apenas as próprias parcelas
+            ...(isOwner
+              ? {}
+              : {
+                  userId,
+                }),
+          },
+
+          include: {
+            purchase: {
+              select: {
+                id: true,
+                description: true,
+                purchaseDate: true,
+              },
+            },
+
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+
+          orderBy: [
+            {
+              purchase: {
+                purchaseDate: 'asc',
+              },
+            },
+            {
+              installmentNumber: 'asc',
+            },
+          ],
+        }
+      )
+
+    // 💰 total da invoice
+    const total =
+      installments.reduce(
+        (acc, installment) =>
+          acc +
+          Number(installment.amount),
+        0
+      )
+
+    // 👥 total por usuário
+    let totalsByUser: Record<
+      string,
+      {
+        userId: string
+        name: string
+        total: number
+      }
+    > | null = null
+
+    // apenas owner visualiza agrupamento completo
     if (isOwner) {
-      totalsByUser = purchases.reduce<Record<string, number>>(
-        (acc, purchase) => {
-          const key = purchase.userId;
+      totalsByUser =
+        installments.reduce(
+          (acc, installment) => {
+            const key =
+              installment.user.id
 
-          if (!acc[key]) {
-            acc[key] = 0;
-          }
+            if (!acc[key]) {
+              acc[key] = {
+                userId:
+                  installment.user.id,
 
-          acc[key] += Number(purchase.amount);
-          return acc;
-        },
-        {}
-      );
+                name:
+                  installment.user.name,
+
+                total: 0,
+              }
+            }
+
+            acc[key].total += Number(
+              installment.amount
+            )
+
+            return acc
+          },
+          {} as Record<
+            string,
+            {
+              userId: string
+              name: string
+              total: number
+            }
+          >
+        )
     }
 
+    // 📄 retorno da invoice dinâmica
     return {
       card: {
         id: card.id,
+
         name: card.name,
-        totalLimit: Number(card.totalLimit),
+
+        totalLimit: Number(
+          card.totalLimit
+        ),
+
+        closingDay: card.closingDay,
+
         dueDay: card.dueDay,
       },
-      invoicePeriod: {
-        startDate,
-        endDate,
+
+      competence: {
+        month,
+        year,
       },
-      month,
-      year,
+
       total,
-      purchases,
+
+      installments: installments.map(
+        (installment) => ({
+          id: installment.id,
+
+          amount: Number(
+            installment.amount
+          ),
+
+          installmentNumber:
+            installment.installmentNumber,
+
+          status: installment.status,
+
+          purchase: {
+            id:
+              installment.purchase.id,
+
+            description:
+              installment.purchase
+                .description,
+
+            purchaseDate:
+              installment.purchase
+                .purchaseDate,
+          },
+
+          user: {
+            id: installment.user.id,
+
+            name:
+              installment.user.name,
+
+            email:
+              installment.user.email,
+          },
+        })
+      ),
+
       totalsByUser,
-    };
+    }
   }
 }

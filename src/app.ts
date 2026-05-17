@@ -12,6 +12,8 @@ import { healthRoutes } from './routes/health.routes.js'
 import { authRoutes } from './modules/auth/auth.routes.js'
 import { userRoutes } from './modules/users/user.routes.js'
 import { purchaseRoutes } from './modules/purchases/purchase.routes.js'
+import { invoiceRoutes } from './modules/invoices/invoice.routes.js'
+import { paymentRoutes } from './modules/payments/payment.routes.js'
 
 
 export const app = Fastify({
@@ -31,3 +33,5 @@ app.register(authRoutes)
 app.register(userRoutes)
 app.register(cardRoutes)
 app.register(purchaseRoutes)
+app.register(invoiceRoutes)
+app.register(paymentRoutes)
