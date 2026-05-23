@@ -60,7 +60,6 @@ export class CardController {
           ownerId: String(
             request.user.sub
           ),
-
           creditCardId:
             params.cardId,
 
@@ -71,6 +70,7 @@ export class CardController {
             body.limitGranted,
         }
       )
+          console.log(request.user)
 
     return reply
       .status(201)

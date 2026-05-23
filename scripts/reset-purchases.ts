@@ -1,4 +1,4 @@
-import { prisma } from '../infra/database/prisma.js'
+import { prisma } from '../src/infra/database/prisma'
 
 async function main() {
   await prisma.purchaseInstallment.deleteMany()

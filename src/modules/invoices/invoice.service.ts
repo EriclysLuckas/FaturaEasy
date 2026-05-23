@@ -4,12 +4,15 @@ import { prisma } from '../../infra/database/prisma.js'
 
 import { PermissionService } from '../permissions/permissions.service.js'
 
-import { InvoiceEngineService } from './invoice-engine.service.js'
+import { InvoiceLifecycleService } from './invoice-lifecycle.service.js'
 
 interface GetInvoiceInput {
   userId: string
+
   creditCardId: string
+
   month: number
+
   year: number
 }
 
@@ -17,8 +20,8 @@ export class InvoiceService {
   private permissionService =
     new PermissionService()
 
-  private invoiceEngine =
-    new InvoiceEngineService()
+  private invoiceLifecycleService =
+    new InvoiceLifecycleService()
 
   async getInvoice({
     userId,
@@ -26,7 +29,10 @@ export class InvoiceService {
     month,
     year,
   }: GetInvoiceInput) {
+    //
     // 🔐 valida permissões
+    //
+
     const isOwner =
       await this.permissionService.isCardOwner(
         userId,
@@ -44,25 +50,6 @@ export class InvoiceService {
     }
 
     //
-    // 🔥 GARANTE INVOICE PERSISTIDA
-    //
-
-    const invoice =
-      await this.invoiceEngine.ensureInvoiceExists(
-        creditCardId,
-        month,
-        year
-      )
-
-    //
-    // 🔥 AUTO CLOSE ENGINE
-    //
-
-    await this.invoiceEngine.autoCloseInvoice(
-      invoice.id
-    )
-
-    //
     // 💳 busca cartão
     //
 
@@ -74,9 +61,13 @@ export class InvoiceService {
 
         select: {
           id: true,
+
           name: true,
+
           totalLimit: true,
+
           closingDay: true,
+
           dueDay: true,
         },
       })
@@ -97,13 +88,10 @@ export class InvoiceService {
 
             competenceYear: year,
 
-            status: 'PENDING',
-
             purchase: {
               creditCardId,
             },
 
-            // usuário secundário vê apenas as próprias parcelas
             ...(isOwner
               ? {}
               : {
@@ -115,7 +103,9 @@ export class InvoiceService {
             purchase: {
               select: {
                 id: true,
+
                 description: true,
+
                 purchaseDate: true,
               },
             },
@@ -123,7 +113,9 @@ export class InvoiceService {
             user: {
               select: {
                 id: true,
+
                 name: true,
+
                 email: true,
               },
             },
@@ -135,6 +127,7 @@ export class InvoiceService {
                 purchaseDate: 'asc',
               },
             },
+
             {
               installmentNumber: 'asc',
             },
@@ -143,31 +136,105 @@ export class InvoiceService {
       )
 
     //
-    // 💰 total da invoice
+    // 🔥 sem parcelas = sem invoice
+    //
+
+    if (installments.length === 0) {
+      return {
+        message:
+          'No invoice for this period',
+
+        card: {
+          id: card.id,
+
+          name: card.name,
+        },
+
+        competence: {
+          month,
+          year,
+        },
+
+        total: 0,
+
+        installments: [],
+      }
+    }
+
+    //
+    // 🔥 busca invoice persistida
+    //
+
+    const invoice =
+      await prisma.invoice.findUnique({
+        where: {
+          creditCardId_month_year: {
+            creditCardId,
+            month,
+            year,
+          },
+        },
+      })
+
+    if (!invoice) {
+      throw new Error(
+        'Invoice record not found'
+      )
+    }
+
+    //
+    // 🔥 calcula status REAL
+    //
+
+    const calculatedStatus =
+      this.invoiceLifecycleService.getInvoiceStatus(
+        {
+          month:
+            invoice.month,
+
+          year:
+            invoice.year,
+
+          status:
+            invoice.status,
+
+          paidAt:
+            invoice.paidAt,
+
+          closingDay:
+            card.closingDay,
+        }
+      )
+
+    //
+    // 💰 total dinâmico
     //
 
     const total =
       installments.reduce(
         (acc, installment) =>
           acc +
-          Number(installment.amount),
+          Number(
+            installment.amount
+          ),
         0
       )
 
     //
-    // 👥 total por usuário
+    // 👥 totais por usuário
     //
 
     let totalsByUser: Record<
       string,
       {
         userId: string
+
         name: string
+
         total: number
       }
     > | null = null
 
-    // apenas owner visualiza agrupamento completo
     if (isOwner) {
       totalsByUser =
         installments.reduce(
@@ -197,7 +264,9 @@ export class InvoiceService {
             string,
             {
               userId: string
+
               name: string
+
               total: number
             }
           >
@@ -205,22 +274,21 @@ export class InvoiceService {
     }
 
     //
-    // 📄 retorno invoice dinâmica
+    // 📄 retorno final
     //
 
     return {
       invoice: {
         id: invoice.id,
 
-        status: invoice.status,
+        status:
+          calculatedStatus,
 
-        totalAmount: Number(
-          invoice.totalAmount
-        ),
+        closedAt:
+          invoice.closedAt,
 
-        closedAt: invoice.closedAt,
-
-        paidAt: invoice.paidAt,
+        paidAt:
+          invoice.paidAt,
       },
 
       card: {
@@ -232,7 +300,8 @@ export class InvoiceService {
           card.totalLimit
         ),
 
-        closingDay: card.closingDay,
+        closingDay:
+          card.closingDay,
 
         dueDay: card.dueDay,
       },
@@ -255,7 +324,8 @@ export class InvoiceService {
           installmentNumber:
             installment.installmentNumber,
 
-          status: installment.status,
+          status:
+            installment.status,
 
           purchase: {
             id:
@@ -271,7 +341,8 @@ export class InvoiceService {
           },
 
           user: {
-            id: installment.user.id,
+            id:
+              installment.user.id,
 
             name:
               installment.user.name,

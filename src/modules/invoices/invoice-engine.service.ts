@@ -3,280 +3,138 @@
 import { prisma } from '../../infra/database/prisma.js'
 
 export class InvoiceEngineService {
-  async ensureInvoiceExists(
-    creditCardId: string,
-    month: number,
-    year: number
-  ) {
-    //
-    // verifica se invoice já existe
-    //
-    const existingInvoice =
-      await prisma.invoice.findUnique({
-        where: {
-          creditCardId_month_year: {
-            creditCardId,
-            month,
-            year,
-          },
-        },
-      })
+//
+// 🔥 garante existência da invoice
+//
 
-    if (existingInvoice) {
-      //
-      // se estiver OPEN
-      // recalcula total dinâmico
-      //
-      if (
-        existingInvoice.status ===
-        'OPEN'
-      ) {
-        await this.updateInvoiceTotal(
-          existingInvoice.id
-        )
-      }
+async ensureInvoiceExists(
+creditCardId: string,
+month: number,
+year: number
+) {
+const existingInvoice =
+await prisma.invoice.findUnique({
+where: {
+creditCardId_month_year: {
+creditCardId,
+month,
+year,
+},
+},
+})
 
-      return existingInvoice
-    }
+if (existingInvoice) {
+  return existingInvoice
+}
 
-    //
-    // busca cartão
-    //
-    const card =
-      await prisma.creditCard.findUnique({
-        where: {
-          id: creditCardId,
-        },
-      })
+return prisma.invoice.create({
+  data: {
+    creditCardId,
 
-    if (!card) {
-      throw new Error(
-        'Card not found'
-      )
-    }
+    month,
 
-    //
-    // calcula total inicial
-    //
-    const installments =
-      await prisma.purchaseInstallment.findMany(
-        {
-          where: {
-            competenceMonth: month,
+    year,
 
-            competenceYear: year,
+    status: 'OPEN',
 
-            status: 'PENDING',
+    totalAmount: 0,
+  },
+})
 
-            purchase: {
-              creditCardId,
-            },
-          },
-        }
-      )
+}
 
-    const totalAmount =
-      installments.reduce(
-        (acc, installment) =>
-          acc +
-          Number(installment.amount),
-        0
-      )
+//
+// 🔥 recalcula valor REAL da invoice
+//
 
-    //
-    // cria invoice
-    //
-    const invoice =
-      await prisma.invoice.create({
-        data: {
+async recalculateInvoiceTotal(
+creditCardId: string,
+month: number,
+year: number
+) {
+//
+// busca parcelas pendentes
+//
+
+const installments =
+  await prisma.purchaseInstallment.findMany(
+    {
+      where: {
+        competenceMonth: month,
+
+        competenceYear: year,
+
+        status: 'PENDING',
+
+        purchase: {
           creditCardId,
-
-          month,
-
-          year,
-
-          totalAmount,
-
-          status: 'OPEN',
-
-          openedAt: new Date(),
         },
-      })
-
-    return invoice
-  }
-
-  //
-  // recalcula total da invoice
-  //
-  async updateInvoiceTotal(
-    invoiceId: string
-  ) {
-    const invoice =
-      await prisma.invoice.findUnique({
-        where: {
-          id: invoiceId,
-        },
-      })
-
-    if (!invoice) {
-      throw new Error(
-        'Invoice not found'
-      )
-    }
-
-    //
-    // apenas OPEN recalcula
-    //
-    if (
-      invoice.status !== 'OPEN'
-    ) {
-      return invoice
-    }
-
-    const installments =
-      await prisma.purchaseInstallment.findMany(
-        {
-          where: {
-            competenceMonth:
-              invoice.month,
-
-            competenceYear:
-              invoice.year,
-
-            status: 'PENDING',
-
-            purchase: {
-              creditCardId:
-                invoice.creditCardId,
-            },
-          },
-        }
-      )
-
-    const totalAmount =
-      installments.reduce(
-        (acc, installment) =>
-          acc +
-          Number(installment.amount),
-        0
-      )
-
-    return prisma.invoice.update({
-      where: {
-        id: invoice.id,
       },
 
-      data: {
-        totalAmount,
+      select: {
+        amount: true,
       },
-    })
-  }
-
-  //
-  // fechamento automático
-  //
-  async autoCloseInvoice(
-    invoiceId: string
-  ) {
-    const invoice =
-      await prisma.invoice.findUnique({
-        where: {
-          id: invoiceId,
-        },
-
-        include: {
-          creditCard: true,
-        },
-      })
-
-    if (!invoice) {
-      throw new Error(
-        'Invoice not found'
-      )
     }
+  )
 
-    //
-    // já fechada
-    //
-    if (
-      invoice.status !== 'OPEN'
-    ) {
-      return invoice
-    }
+//
+// soma total
+//
 
-    const now = new Date()
+const totalAmount =
+  installments.reduce(
+    (acc, installment) =>
+      acc +
+      Number(installment.amount),
+    0
+  )
 
-    //
-    // data de fechamento
-    //
-    const closingDate = new Date(
-      invoice.year,
-      invoice.month - 1,
-      invoice.creditCard.closingDay,
-      23,
-      59,
-      59
-    )
+//
+// atualiza invoice
+//
 
-    //
-    // ainda não chegou fechamento
-    //
-    if (now < closingDate) {
-      return invoice
-    }
+return prisma.invoice.update({
+  where: {
+    creditCardId_month_year: {
+      creditCardId,
+      month,
+      year,
+    },
+  },
 
-    //
-    // fecha invoice
-    //
-    return prisma.invoice.update({
-      where: {
-        id: invoice.id,
-      },
+  data: {
+    totalAmount,
+  },
+})
 
-      data: {
-        status: 'CLOSED',
+}
 
-        closedAt: new Date(),
-      },
-    })
-  }
+//
+// 🔥 sincroniza invoice
+//
 
-  //
-  // marcar invoice como paga
-  //
-  async markInvoiceAsPaid(
-    creditCardId: string,
-    month: number,
-    year: number
-  ) {
-    const invoice =
-      await prisma.invoice.findUnique({
-        where: {
-          creditCardId_month_year: {
-            creditCardId,
-            month,
-            year,
-          },
-        },
-      })
+async syncInvoice(
+creditCardId: string,
+month: number,
+year: number
+) {
+//
+// garante invoice
+//
 
-    if (!invoice) {
-      throw new Error(
-        'Invoice not found'
-      )
-    }
+await this.ensureInvoiceExists(
+  creditCardId,
+  month,
+  year
+)
 
-    return prisma.invoice.update({
-      where: {
-        id: invoice.id,
-      },
 
-      data: {
-        status: 'PAID',
 
-        paidAt: new Date(),
-      },
-    })
-  }
+return this.recalculateInvoiceTotal(
+  creditCardId,
+  month,
+  year
+)
+
+}
 }

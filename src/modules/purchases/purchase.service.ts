@@ -4,8 +4,13 @@ import { prisma } from '../../infra/database/prisma.js'
 
 import { PermissionService } from '../permissions/permissions.service.js'
 
+import { InvoiceEngineService } from '../invoices/invoice-engine.service.js'
+
 const permissionService =
   new PermissionService()
+
+const invoiceEngine =
+  new InvoiceEngineService()
 
 interface CreatePurchaseInput {
   description: string
@@ -25,7 +30,10 @@ export class PurchaseService {
   async create(
     data: CreatePurchaseInput
   ) {
-    // valida se usuário pertence ao cartão
+    //
+    // 🔐 VALIDA USUÁRIO DO CARTÃO
+    //
+
     const isCardUser =
       await permissionService.isCardUser(
         data.userId,
@@ -38,7 +46,10 @@ export class PurchaseService {
       )
     }
 
-    // busca vínculo usuário/cartão
+    //
+    // 🔗 BUSCA VÍNCULO USUÁRIO/CARTÃO
+    //
+
     const cardLink =
       await prisma.creditCardUser.findUnique(
         {
@@ -59,7 +70,10 @@ export class PurchaseService {
       )
     }
 
-    // busca cartão
+    //
+    // 💳 BUSCA CARTÃO
+    //
+
     const card =
       await prisma.creditCard.findUnique({
         where: {
@@ -74,7 +88,7 @@ export class PurchaseService {
     }
 
     //
-    // 🔹 LIMITE INDIVIDUAL DO USUÁRIO
+    // 🔹 LIMITE INDIVIDUAL
     //
 
     const userPendingInstallments =
@@ -106,7 +120,7 @@ export class PurchaseService {
       userUsedLimit
 
     //
-    // 🔹 LIMITE GLOBAL DO CARTÃO
+    // 🔹 LIMITE GLOBAL
     //
 
     const cardPendingInstallments =
@@ -170,8 +184,11 @@ export class PurchaseService {
     let competenceYear =
       data.purchaseDate.getFullYear()
 
+    //
     // compra após fechamento
-    // entra na próxima competência
+    // entra próxima competência
+    //
+
     if (
       purchaseDay > card.closingDay
     ) {
@@ -206,12 +223,15 @@ export class PurchaseService {
     )
 
     //
-    // 🔹 TRANSACTION
+    // 🔥 TRANSACTION
     //
 
     return prisma.$transaction(
       async (tx) => {
-        // cria compra
+        //
+        // 🔥 CRIA PURCHASE
+        //
+
         const purchase =
           await tx.purchase.create({
             data: {
@@ -233,7 +253,17 @@ export class PurchaseService {
             },
           })
 
-        // gera parcelas
+        //
+        // 🔥 CONTROLA FATURAS JÁ PROCESSADAS
+        //
+
+        const processedInvoices =
+          new Set<string>()
+
+        //
+        // 🔥 GERA PARCELAS
+        //
+
         for (
           let i = 0;
           i < data.installments;
@@ -242,7 +272,10 @@ export class PurchaseService {
           let installmentAmount =
             baseInstallment
 
-          // última parcela absorve diferença decimal
+          //
+          // última parcela absorve diferença
+          //
+
           if (
             i ===
             data.installments - 1
@@ -257,12 +290,19 @@ export class PurchaseService {
           let currentYear =
             competenceYear
 
-          // rollover de ano
+          //
+          // rollover ano
+          //
+
           while (currentMonth > 12) {
             currentMonth -= 12
 
             currentYear += 1
           }
+
+          //
+          // 🔥 CRIA PARCELA
+          //
 
           await tx.purchaseInstallment.create(
             {
@@ -288,6 +328,36 @@ export class PurchaseService {
               },
             }
           )
+
+          //
+          // 🔥 evita processar mesma invoice múltiplas vezes
+          //
+
+          const invoiceKey = `${currentMonth}-${currentYear}`
+
+          if (
+            processedInvoices.has(
+              invoiceKey
+            )
+          ) {
+            continue
+          }
+
+          processedInvoices.add(
+            invoiceKey
+          )
+
+          //
+          // 🔥 GARANTE INVOICE
+          //
+
+          await invoiceEngine.ensureInvoiceExists(
+            data.creditCardId,
+            currentMonth,
+            currentYear
+          )
+
+       
         }
 
         return purchase

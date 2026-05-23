@@ -3,7 +3,7 @@ import { prisma } from '../src/infra/database/prisma.js'
 async function main() {
   const card = await prisma.creditCard.findUnique({
     where: {
-      id: '70df3117-69c0-4a41-b677-631001444ea7',
+      id: 'e2aa2b92-4a50-4320-bcb3-700d4c883755',
     },
 
     select: {

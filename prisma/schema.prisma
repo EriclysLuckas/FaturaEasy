@@ -157,7 +157,7 @@ model Invoice {
 
   status InvoiceStatus @default(OPEN)
 
-  totalAmount Decimal @default(0)
+  //totalAmount Decimal @default(0)
 
   openedAt DateTime @default(now())
 
