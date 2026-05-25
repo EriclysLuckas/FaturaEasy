@@ -8,6 +8,10 @@ import {
 import { z } from 'zod'
 
 import { InvoiceService } from './invoice.service.js'
+import { InvoiceCloseService } from './invoice-close.service.js'
+
+const invoiceCloseService =
+  new InvoiceCloseService()
 
 const invoiceService =
   new InvoiceService()
@@ -48,4 +52,42 @@ export class InvoiceController {
 
     return reply.send(invoice)
   }
+
+
+   //
+  //  FECHAR FATURA
+  //
+
+  async closeInvoice(
+    request: FastifyRequest<{
+      Params: {
+        creditCardId: string
+        month: string
+        year: string
+      }
+    }>,
+    reply: FastifyReply
+  ) {
+    const { creditCardId } =
+      request.params
+
+    const month = Number(
+      request.params.month
+    )
+
+    const year = Number(
+      request.params.year
+    )
+
+    const result =
+      await invoiceCloseService.closeInvoice(
+        creditCardId,
+        month,
+        year
+      )
+
+    return reply.send(result)
+  }
 }
+
+

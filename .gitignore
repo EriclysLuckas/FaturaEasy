@@ -1,3 +1,31 @@
+# dependencies
 node_modules
 
+# prisma generated
 /generated/prisma
+
+# environment
+.env
+
+# build
+dist
+build
+
+# logs
+logs
+*.log
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# coverage
+coverage
+
+# temp
+tmp
+temp

@@ -30,7 +30,7 @@ export class InvoiceService {
     year,
   }: GetInvoiceInput) {
     //
-    // 🔐 valida permissões
+    // valida permissões
     //
 
     const isOwner =
@@ -77,7 +77,7 @@ export class InvoiceService {
     }
 
     //
-    // 📦 busca parcelas da competência
+    //  busca parcelas da competência
     //
 
     const installments =
@@ -136,7 +136,7 @@ export class InvoiceService {
       )
 
     //
-    // 🔥 sem parcelas = sem invoice
+    //  sem parcelas = sem invoice
     //
 
     if (installments.length === 0) {
@@ -162,7 +162,7 @@ export class InvoiceService {
     }
 
     //
-    // 🔥 busca invoice persistida
+    //  busca invoice persistida
     //
 
     const invoice =
@@ -183,7 +183,7 @@ export class InvoiceService {
     }
 
     //
-    // 🔥 calcula status REAL
+    //  calcula status REAL
     //
 
     const calculatedStatus =
@@ -207,7 +207,7 @@ export class InvoiceService {
       )
 
     //
-    // 💰 total dinâmico
+    //  total dinâmico
     //
 
     const total =
@@ -274,7 +274,7 @@ export class InvoiceService {
     }
 
     //
-    // 📄 retorno final
+    //  retorno final
     //
 
     return {

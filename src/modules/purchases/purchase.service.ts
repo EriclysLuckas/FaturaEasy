@@ -6,11 +6,16 @@ import { PermissionService } from '../permissions/permissions.service.js'
 
 import { InvoiceEngineService } from '../invoices/invoice-engine.service.js'
 
+import { InvoiceLifecycleService } from '../invoices/invoice-lifecycle.service.js'
+
 const permissionService =
   new PermissionService()
 
 const invoiceEngine =
   new InvoiceEngineService()
+
+const invoiceLifecycle =
+  new InvoiceLifecycleService()
 
 interface CreatePurchaseInput {
   description: string
@@ -31,7 +36,7 @@ export class PurchaseService {
     data: CreatePurchaseInput
   ) {
     //
-    // 🔐 VALIDA USUÁRIO DO CARTÃO
+    //  VALIDA USUÁRIO DO CARTÃO
     //
 
     const isCardUser =
@@ -47,7 +52,7 @@ export class PurchaseService {
     }
 
     //
-    // 🔗 BUSCA VÍNCULO USUÁRIO/CARTÃO
+    //  BUSCA VÍNCULO USUÁRIO/CARTÃO
     //
 
     const cardLink =
@@ -71,7 +76,7 @@ export class PurchaseService {
     }
 
     //
-    // 💳 BUSCA CARTÃO
+    //  BUSCA CARTÃO
     //
 
     const card =
@@ -88,7 +93,7 @@ export class PurchaseService {
     }
 
     //
-    // 🔹 LIMITE INDIVIDUAL
+    //  LIMITE INDIVIDUAL
     //
 
     const userPendingInstallments =
@@ -120,7 +125,7 @@ export class PurchaseService {
       userUsedLimit
 
     //
-    // 🔹 LIMITE GLOBAL
+    //  LIMITE GLOBAL
     //
 
     const cardPendingInstallments =
@@ -150,7 +155,7 @@ export class PurchaseService {
       cardUsedLimit
 
     //
-    // 🔹 VALIDAÇÕES
+    //  VALIDAÇÕES
     //
 
     if (
@@ -172,7 +177,7 @@ export class PurchaseService {
     }
 
     //
-    // 🔹 COMPETÊNCIA FINANCEIRA
+    //  COMPETÊNCIA FINANCEIRA
     //
 
     const purchaseDay =
@@ -202,7 +207,7 @@ export class PurchaseService {
     }
 
     //
-    // 🔹 DISTRIBUIÇÃO FINANCEIRA
+    //  DISTRIBUIÇÃO FINANCEIRA
     //
 
     const baseInstallment =
@@ -223,13 +228,13 @@ export class PurchaseService {
     )
 
     //
-    // 🔥 TRANSACTION
+    //  TRANSACTION
     //
 
     return prisma.$transaction(
       async (tx) => {
         //
-        // 🔥 CRIA PURCHASE
+        //  CRIA PURCHASE
         //
 
         const purchase =
@@ -254,14 +259,14 @@ export class PurchaseService {
           })
 
         //
-        // 🔥 CONTROLA FATURAS JÁ PROCESSADAS
+        //  CONTROLA FATURAS PROCESSADAS
         //
 
         const processedInvoices =
           new Set<string>()
 
         //
-        // 🔥 GERA PARCELAS
+        //  GERA PARCELAS
         //
 
         for (
@@ -301,7 +306,64 @@ export class PurchaseService {
           }
 
           //
-          // 🔥 CRIA PARCELA
+          //  VALIDA FATURA EXISTENTE
+          //
+
+          const existingInvoice =
+            await tx.invoice.findUnique({
+              where: {
+                creditCardId_month_year: {
+                  creditCardId:
+                    data.creditCardId,
+
+                  month:
+                    currentMonth,
+
+                  year:
+                    currentYear,
+                },
+              },
+            })
+
+          if (existingInvoice) {
+            const invoiceStatus =
+              invoiceLifecycle.getInvoiceStatus(
+                {
+                  month:
+                    existingInvoice.month,
+
+                  year:
+                    existingInvoice.year,
+
+                  status:
+                    existingInvoice.status,
+
+                  paidAt:
+                    existingInvoice.paidAt,
+
+                  closingDay:
+                    card.closingDay,
+                }
+              )
+
+            //
+            //  BLOQUEIA FATURA FECHADA/PAGA
+            //
+
+            if (
+              invoiceStatus ===
+                'CLOSED' ||
+              invoiceStatus ===
+                'PAID'
+            ) {
+              throw new Error(
+                `Invoice ${currentMonth}/${currentYear} is closed`
+              )
+            }
+          }
+
+          //
+          //  CRIA PARCELA
           //
 
           await tx.purchaseInstallment.create(
@@ -330,7 +392,7 @@ export class PurchaseService {
           )
 
           //
-          // 🔥 evita processar mesma invoice múltiplas vezes
+          //  evita processar mesma invoice
           //
 
           const invoiceKey = `${currentMonth}-${currentYear}`
@@ -348,7 +410,7 @@ export class PurchaseService {
           )
 
           //
-          // 🔥 GARANTE INVOICE
+          //  GARANTE INVOICE
           //
 
           await invoiceEngine.ensureInvoiceExists(
@@ -356,8 +418,6 @@ export class PurchaseService {
             currentMonth,
             currentYear
           )
-
-       
         }
 
         return purchase

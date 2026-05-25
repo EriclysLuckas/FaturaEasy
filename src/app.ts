@@ -1,6 +1,8 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import fastifyJwt from '@fastify/jwt'
+import { startScheduler }  from './jobs/scheduler.js'
+
 
 
 
@@ -15,16 +17,16 @@ import { purchaseRoutes } from './modules/purchases/purchase.routes.js'
 import { invoiceRoutes } from './modules/invoices/invoice.routes.js'
 import { paymentRoutes } from './modules/payments/payment.routes.js'
 
-
+startScheduler()
 export const app = Fastify({
   logger: true,
 })
 
 app.setErrorHandler(errorHandler)
 
-app.register(cors)
 
 app.register(fastifyJwt, jwtConfig)
+app.register(cors)
 
 
 //REGISTROS DE ROTAS
