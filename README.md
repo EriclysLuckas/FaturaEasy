@@ -1,5 +1,18 @@
 # 💳 Fatura Easy
 
+<p align="left">
+
+<img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" />
+<img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
+<img src="https://img.shields.io/badge/Fastify-000000?style=for-the-badge&logo=fastify&logoColor=white" />
+<img src="https://img.shields.io/badge/Prisma-2D3748?style=for-the-badge&logo=prisma&logoColor=white" />
+<img src="https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white" />
+<img src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white" />
+<img src="https://img.shields.io/badge/JWT-000000?style=for-the-badge&logo=jsonwebtokens&logoColor=white" />
+
+</p>
+
+
 Backend para gerenciamento de faturas compartilhadas entre múltiplos usuários, com foco em consistência financeira, controle de limites e automação de invoices.
 
 O projeto surgiu para resolver um problema real de organização financeira familiar relacionado ao controle de gastos compartilhados em cartões de crédito, fechamento de faturas e acompanhamento de responsabilidades individuais.
