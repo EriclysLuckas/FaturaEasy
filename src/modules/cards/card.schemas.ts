@@ -15,3 +15,24 @@ export const addUserToCardSchema = z.object({
 
   limitGranted: z.number().positive(),
 })
+
+export const updateCreditCardSchema =
+  z.object({
+    name:
+      z.string().min(2).optional(),
+
+    totalLimit:
+      z.number().positive().optional(),
+
+    closingDay:
+      z.number()
+        .min(1)
+        .max(31)
+        .optional(),
+
+    dueDay:
+      z.number()
+        .min(1)
+        .max(31)
+        .optional(),
+  })

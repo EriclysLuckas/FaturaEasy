@@ -1,12 +1,19 @@
 // src/modules/purchases/purchase.service.ts
 
-import { prisma } from '../../infra/database/prisma.js'
+import { prisma }
+  from '../../infra/database/prisma.js'
 
-import { PermissionService } from '../permissions/permissions.service.js'
+import { AppError }
+  from '../../shared/errors/app-error.js'
 
-import { InvoiceEngineService } from '../invoices/invoice-engine.service.js'
+import { PermissionService }
+  from '../permissions/permissions.service.js'
 
-import { InvoiceLifecycleService } from '../invoices/invoice-lifecycle.service.js'
+import { InvoiceEngineService }
+  from '../invoices/invoice-engine.service.js'
+
+import { InvoiceLifecycleService }
+  from '../invoices/invoice-lifecycle.service.js'
 
 const permissionService =
   new PermissionService()
@@ -31,12 +38,28 @@ interface CreatePurchaseInput {
   userId: string
 }
 
+interface GetPurchaseInput {
+  id: string
+
+  userId: string
+}
+
+interface CancelPurchaseInput {
+  id: string
+
+  userId: string
+}
+
 export class PurchaseService {
+  //
+  // CREATE PURCHASE
+  //
+
   async create(
     data: CreatePurchaseInput
   ) {
     //
-    //  VALIDA USUÁRIO DO CARTÃO
+    // VALIDA USUÁRIO DO CARTÃO
     //
 
     const isCardUser =
@@ -46,13 +69,14 @@ export class PurchaseService {
       )
 
     if (!isCardUser) {
-      throw new Error(
-        'User does not belong to this card'
+      throw new AppError(
+        'User does not belong to this card',
+        403
       )
     }
 
     //
-    //  BUSCA VÍNCULO USUÁRIO/CARTÃO
+    // BUSCA VÍNCULO
     //
 
     const cardLink =
@@ -70,13 +94,14 @@ export class PurchaseService {
       )
 
     if (!cardLink) {
-      throw new Error(
-        'Card link not found'
+      throw new AppError(
+        'Card link not found',
+        404
       )
     }
 
     //
-    //  BUSCA CARTÃO
+    // BUSCA CARTÃO
     //
 
     const card =
@@ -87,13 +112,14 @@ export class PurchaseService {
       })
 
     if (!card) {
-      throw new Error(
-        'Card not found'
+      throw new AppError(
+        'Card not found',
+        404
       )
     }
 
     //
-    //  LIMITE INDIVIDUAL
+    // LIMITE INDIVIDUAL
     //
 
     const userPendingInstallments =
@@ -125,7 +151,7 @@ export class PurchaseService {
       userUsedLimit
 
     //
-    //  LIMITE GLOBAL
+    // LIMITE GLOBAL
     //
 
     const cardPendingInstallments =
@@ -155,15 +181,16 @@ export class PurchaseService {
       cardUsedLimit
 
     //
-    //  VALIDAÇÕES
+    // VALIDAÇÕES
     //
 
     if (
       data.amount >
       userAvailableLimit
     ) {
-      throw new Error(
-        'User limit exceeded'
+      throw new AppError(
+        'User limit exceeded',
+        400
       )
     }
 
@@ -171,13 +198,14 @@ export class PurchaseService {
       data.amount >
       cardAvailableLimit
     ) {
-      throw new Error(
-        'Card has insufficient limit'
+      throw new AppError(
+        'Card has insufficient limit',
+        400
       )
     }
 
     //
-    //  COMPETÊNCIA FINANCEIRA
+    // COMPETÊNCIA FINANCEIRA
     //
 
     const purchaseDay =
@@ -190,8 +218,7 @@ export class PurchaseService {
       data.purchaseDate.getFullYear()
 
     //
-    // compra após fechamento
-    // entra próxima competência
+    // COMPRA APÓS FECHAMENTO
     //
 
     if (
@@ -207,7 +234,7 @@ export class PurchaseService {
     }
 
     //
-    //  DISTRIBUIÇÃO FINANCEIRA
+    // DISTRIBUIÇÃO FINANCEIRA
     //
 
     const baseInstallment =
@@ -228,13 +255,13 @@ export class PurchaseService {
     )
 
     //
-    //  TRANSACTION
+    // TRANSACTION
     //
 
     return prisma.$transaction(
       async (tx) => {
         //
-        //  CRIA PURCHASE
+        // CRIA PURCHASE
         //
 
         const purchase =
@@ -259,14 +286,14 @@ export class PurchaseService {
           })
 
         //
-        //  CONTROLA FATURAS PROCESSADAS
+        // CONTROLE DE FATURAS
         //
 
         const processedInvoices =
           new Set<string>()
 
         //
-        //  GERA PARCELAS
+        // GERA PARCELAS
         //
 
         for (
@@ -278,7 +305,7 @@ export class PurchaseService {
             baseInstallment
 
           //
-          // última parcela absorve diferença
+          // ÚLTIMA PARCELA
           //
 
           if (
@@ -296,7 +323,7 @@ export class PurchaseService {
             competenceYear
 
           //
-          // rollover ano
+          // ROLLOVER ANO
           //
 
           while (currentMonth > 12) {
@@ -306,7 +333,7 @@ export class PurchaseService {
           }
 
           //
-          //  VALIDA FATURA EXISTENTE
+          // VALIDA FATURA
           //
 
           const existingInvoice =
@@ -346,24 +373,21 @@ export class PurchaseService {
                 }
               )
 
-            //
-            //  BLOQUEIA FATURA FECHADA/PAGA
-            //
-
             if (
               invoiceStatus ===
                 'CLOSED' ||
               invoiceStatus ===
                 'PAID'
             ) {
-              throw new Error(
-                `Invoice ${currentMonth}/${currentYear} is closed`
+              throw new AppError(
+                `Invoice ${currentMonth}/${currentYear} is closed`,
+                400
               )
             }
           }
 
           //
-          //  CRIA PARCELA
+          // CRIA PARCELA
           //
 
           await tx.purchaseInstallment.create(
@@ -392,10 +416,11 @@ export class PurchaseService {
           )
 
           //
-          //  evita processar mesma invoice
+          // EVITA DUPLICIDADE
           //
 
-          const invoiceKey = `${currentMonth}-${currentYear}`
+          const invoiceKey =
+            `${currentMonth}-${currentYear}`
 
           if (
             processedInvoices.has(
@@ -410,7 +435,7 @@ export class PurchaseService {
           )
 
           //
-          //  GARANTE INVOICE
+          // GARANTE INVOICE
           //
 
           await invoiceEngine.ensureInvoiceExists(
@@ -423,5 +448,254 @@ export class PurchaseService {
         return purchase
       }
     )
+  }
+
+  //
+  // LISTA COMPRAS
+  //
+
+  async listByCard(
+    creditCardId: string,
+    userId: string
+  ) {
+    const isCardUser =
+      await permissionService.isCardUser(
+        userId,
+        creditCardId
+      )
+
+    if (!isCardUser) {
+      throw new AppError(
+        'Access denied',
+        403
+      )
+    }
+
+    return prisma.purchase.findMany({
+      where: {
+        creditCardId,
+      },
+
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+
+        installmentsData: true,
+      },
+
+      orderBy: {
+        purchaseDate: 'desc',
+      },
+    })
+  }
+
+  //
+  // BUSCA COMPRA
+  //
+
+  async getById(
+    data: GetPurchaseInput
+  ) {
+    const purchase =
+      await prisma.purchase.findUnique({
+        where: {
+          id: data.id,
+        },
+
+        include: {
+          installmentsData: true,
+
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          },
+
+          creditCard: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      })
+
+    if (!purchase) {
+      throw new AppError(
+        'Purchase not found',
+        404
+      )
+    }
+
+    const isCardUser =
+      await permissionService.isCardUser(
+        data.userId,
+        purchase.creditCardId
+      )
+
+    if (!isCardUser) {
+      throw new AppError(
+        'Access denied',
+        403
+      )
+    }
+
+    return purchase
+  }
+
+  //
+  // CANCELA COMPRA
+  //
+
+  async cancel(
+    data: CancelPurchaseInput
+  ) {
+    const purchase =
+      await prisma.purchase.findUnique({
+        where: {
+          id: data.id,
+        },
+
+        include: {
+          installmentsData: true,
+
+          creditCard: true,
+        },
+      })
+
+    if (!purchase) {
+      throw new AppError(
+        'Purchase not found',
+        404
+      )
+    }
+
+    const isOwner =
+      await permissionService.isCardOwner(
+        data.userId,
+        purchase.creditCardId
+      )
+
+    if (!isOwner) {
+      throw new AppError(
+        'Access denied',
+        403
+      )
+    }
+
+    //
+    // VALIDA FATURAS
+    //
+
+    for (const installment of purchase.installmentsData) {
+      const invoice =
+        await prisma.invoice.findUnique({
+          where: {
+            creditCardId_month_year: {
+              creditCardId:
+                purchase.creditCardId,
+
+              month:
+                installment.competenceMonth,
+
+              year:
+                installment.competenceYear,
+            },
+          },
+        })
+
+      if (!invoice) {
+        continue
+      }
+
+      const invoiceStatus =
+        invoiceLifecycle.getInvoiceStatus(
+          {
+            month: invoice.month,
+
+            year: invoice.year,
+
+            status:
+              invoice.status,
+
+            paidAt:
+              invoice.paidAt,
+
+            closingDay:
+              purchase.creditCard
+                .closingDay,
+          }
+        )
+
+      if (
+        invoiceStatus === 'CLOSED' ||
+        invoiceStatus === 'PAID'
+      ) {
+        throw new AppError(
+          `Invoice ${installment.competenceMonth}/${installment.competenceYear} is closed`,
+          400
+        )
+      }
+    }
+
+    //
+    // CANCELA PARCELAS
+    //
+
+    await prisma.purchaseInstallment.updateMany(
+      {
+        where: {
+          purchaseId: data.id,
+        },
+
+        data: {
+          status: 'CANCELED',
+        },
+      }
+    )
+
+    //
+    // RECALCULA FATURAS
+    //
+
+    const processedInvoices =
+      new Set<string>()
+
+    for (const installment of purchase.installmentsData) {
+      const invoiceKey =
+        `${installment.competenceMonth}-${installment.competenceYear}`
+
+      if (
+        processedInvoices.has(
+          invoiceKey
+        )
+      ) {
+        continue
+      }
+
+      processedInvoices.add(
+        invoiceKey
+      )
+
+      await invoiceEngine.syncInvoice(
+        purchase.creditCardId,
+        installment.competenceMonth,
+        installment.competenceYear
+      )
+    }
+
+    return {
+      success: true,
+
+      message:
+        'Purchase canceled successfully',
+    }
   }
 }

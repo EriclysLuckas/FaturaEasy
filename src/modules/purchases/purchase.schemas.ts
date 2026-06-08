@@ -16,3 +16,20 @@ export const createPurchaseSchema =
 
     creditCardId: z.string().uuid(),
   })
+
+export const purchaseIdSchema =
+  z.object({
+    id: z.string().uuid(),
+  })
+
+export const listPurchasesQuerySchema =
+  z.object({
+    creditCardId:
+      z.string().uuid().optional(),
+
+    month:
+      z.coerce.number().optional(),
+
+    year:
+      z.coerce.number().optional(),
+  })

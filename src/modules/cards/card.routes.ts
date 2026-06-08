@@ -11,7 +11,10 @@ const creditCardController =
 export async function cardRoutes(
   app: FastifyInstance
 ) {
-  // Criar cartão
+  //
+  // criar cartão
+  //
+
   app.post(
     '/cards',
     {
@@ -20,7 +23,46 @@ export async function cardRoutes(
     creditCardController.create
   )
 
-  // Vincular usuário ao cartão
+  //
+  // listar cartões
+  //
+
+  app.get(
+    '/cards',
+    {
+      preHandler: [authMiddleware],
+    },
+    creditCardController.list
+  )
+
+  //
+  // buscar cartão
+  //
+
+  app.get(
+    '/cards/:cardId',
+    {
+      preHandler: [authMiddleware],
+    },
+    creditCardController.getById
+  )
+
+  //
+  // atualizar cartão
+  //
+
+  app.put(
+    '/cards/:cardId',
+    {
+      preHandler: [authMiddleware],
+    },
+    creditCardController.update
+  )
+
+  //
+  // vincular usuário
+  //
+
   app.post(
     '/cards/:cardId/users',
     {
@@ -28,4 +70,11 @@ export async function cardRoutes(
     },
     creditCardController.addUser
   )
+  app.get(
+  '/cards/:cardId/users',
+  {
+    preHandler: [authMiddleware],
+  },
+  creditCardController.getUsers
+)
 }

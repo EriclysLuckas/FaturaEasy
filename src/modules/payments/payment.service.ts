@@ -56,7 +56,7 @@ export class PaymentService {
     }
 
     //
-    // 🔥 STATUS DINÂMICO
+    //  STATUS DINÂMICO
     //
 
     const calculatedStatus =
@@ -89,7 +89,7 @@ export class PaymentService {
     return prisma.$transaction(
       async (tx) => {
         //
-        // 🔥 PARCELAS PENDENTES
+        //  PARCELAS PENDENTES
         //
 
         const pendingInstallments =
@@ -126,7 +126,7 @@ export class PaymentService {
         }
 
         //
-        // 🔥 TOTAL REAL
+        //  TOTAL REAL
         //
 
         const totalPaid =
@@ -140,7 +140,7 @@ export class PaymentService {
           )
 
         //
-        // 🔥 MARCA PARCELAS COMO PAGAS
+        //  MARCA PARCELAS COMO PAGAS
         //
 
         await tx.purchaseInstallment.updateMany(
@@ -164,7 +164,7 @@ export class PaymentService {
         )
 
         //
-        // 🔥 ATUALIZA FATURA
+        //  ATUALIZA FATURA
         //
 
         const updatedInvoice =

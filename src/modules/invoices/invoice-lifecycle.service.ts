@@ -22,7 +22,7 @@ export class InvoiceLifecycleService {
     closingDay,
   }: InvoiceLifecycleInput) {
     //
-    // 🔥 invoice paga
+    //  invoice paga
     //
 
     if (status === 'PAID' || paidAt) {
@@ -30,7 +30,7 @@ export class InvoiceLifecycleService {
     }
 
     //
-    // 🔥 data atual
+    //  data atual
     //
 
     const now = new Date()
@@ -42,7 +42,7 @@ export class InvoiceLifecycleService {
       now.getFullYear()
 
     //
-    // 🔥 competência futura
+    //  competência futura
     //
 
     if (
@@ -54,7 +54,7 @@ export class InvoiceLifecycleService {
     }
 
     //
-    // 🔥 competência passada
+    //  competência passada
     //
 
     if (
@@ -66,7 +66,7 @@ export class InvoiceLifecycleService {
     }
 
     //
-    // 🔥 mesma competência
+    //  mesma competência
     //
 
     const today =

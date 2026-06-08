@@ -10,6 +10,7 @@ import { CardService } from './card.service.js'
 import {
   addUserToCardSchema,
   createCreditCardSchema,
+  updateCreditCardSchema,
 } from './card.schemas.js'
 
 const cardService =
@@ -76,4 +77,90 @@ export class CardController {
       .status(201)
       .send(result)
   }
+  async list(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  const cards =
+    await cardService.listCards(
+      String(request.user.sub)
+    )
+
+  return reply.send(cards)
+}
+
+async getById(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  const params = z
+    .object({
+      cardId: z.string().uuid(),
+    })
+    .parse(request.params)
+
+  const card =
+    await cardService.getCardById({
+      userId: String(
+        request.user.sub
+      ),
+
+      creditCardId:
+        params.cardId,
+    })
+
+  return reply.send(card)
+}
+
+async update(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  const params = z
+    .object({
+      cardId: z.string().uuid(),
+    })
+    .parse(request.params)
+
+  const body =
+    updateCreditCardSchema.parse(
+      request.body
+    )
+
+  const card =
+    await cardService.updateCard({
+      ownerId: String(
+        request.user.sub
+      ),
+
+      creditCardId:
+        params.cardId,
+
+      ...body,
+    })
+
+  return reply.send(card)
+}
+async getUsers(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  const params = z
+    .object({
+      cardId: z.string().uuid(),
+    })
+    .parse(request.params)
+
+  const users =
+    await cardService.getCardUsers({
+      requesterId: String(
+        request.user.sub
+      ),
+
+      creditCardId:
+        params.cardId,
+    })
+
+  return reply.send(users)
+}
 }

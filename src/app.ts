@@ -1,39 +1,66 @@
 import Fastify from 'fastify'
+
 import cors from '@fastify/cors'
+
 import fastifyJwt from '@fastify/jwt'
+
 import { startScheduler }  from './jobs/scheduler.js'
 
+import { errorHandler }  from './shared/errors/error-handler.js'
 
+import { jwtConfig }  from './config/auth.js'
 
+import { healthRoutes }  from './routes/health.routes.js'
 
-import { errorHandler } from './shared/errors/error-handler.js'
-import { cardRoutes } from './modules/cards/card.routes.js'
+import { authRoutes }  from './modules/auth/auth.routes.js'
 
-import { jwtConfig } from './config/auth.js'
-import { healthRoutes } from './routes/health.routes.js'
-import { authRoutes } from './modules/auth/auth.routes.js'
-import { userRoutes } from './modules/users/user.routes.js'
-import { purchaseRoutes } from './modules/purchases/purchase.routes.js'
-import { invoiceRoutes } from './modules/invoices/invoice.routes.js'
-import { paymentRoutes } from './modules/payments/payment.routes.js'
+import { userRoutes }  from './modules/users/user.routes.js'
+
+import { cardRoutes }  from './modules/cards/card.routes.js'
+
+import { purchaseRoutes }  from './modules/purchases/purchase.routes.js'
+
+import { invoiceRoutes }  from './modules/invoices/invoice.routes.js'
+
+import { paymentRoutes }  from './modules/payments/payment.routes.js'
+
+import { setupSwagger }  from './infra/http/swagger/swagger.js'
+
 
 startScheduler()
+
 export const app = Fastify({
   logger: true,
 })
 
+//
+// PLUGINS
+//
+
+await app.register(cors)
+
+await app.register(fastifyJwt, jwtConfig)
+
+//
+// SWAGGER
+//
+
+await setupSwagger(app)
+
+//
+// ERROR HANDLER
+//
+
 app.setErrorHandler(errorHandler)
 
+//
+// ROUTES
+//
 
-app.register(fastifyJwt, jwtConfig)
-app.register(cors)
-
-
-//REGISTROS DE ROTAS
-app.register(healthRoutes)
-app.register(authRoutes)
-app.register(userRoutes)
-app.register(cardRoutes)
-app.register(purchaseRoutes)
-app.register(invoiceRoutes)
-app.register(paymentRoutes)
+await app.register(healthRoutes)
+await app.register(authRoutes)
+await app.register(userRoutes)
+await app.register(cardRoutes)
+await app.register(purchaseRoutes)
+await app.register(invoiceRoutes)
+await app.register(paymentRoutes)

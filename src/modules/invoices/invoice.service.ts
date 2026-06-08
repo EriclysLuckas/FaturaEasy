@@ -2,9 +2,14 @@
 
 import { prisma } from '../../infra/database/prisma.js'
 
-import { PermissionService } from '../permissions/permissions.service.js'
+import { AppError }
+  from '../../shared/errors/app-error.js'
 
-import { InvoiceLifecycleService } from './invoice-lifecycle.service.js'
+import { PermissionService }
+  from '../permissions/permissions.service.js'
+
+import { InvoiceLifecycleService }
+  from './invoice-lifecycle.service.js'
 
 interface GetInvoiceInput {
   userId: string
@@ -30,7 +35,7 @@ export class InvoiceService {
     year,
   }: GetInvoiceInput) {
     //
-    // valida permissões
+    //  valida permissões
     //
 
     const isOwner =
@@ -46,11 +51,14 @@ export class InvoiceService {
       )
 
     if (!isOwner && !isCardUser) {
-      throw new Error('Access denied')
+      throw new AppError(
+        'Access denied',
+        403
+      )
     }
 
     //
-    // 💳 busca cartão
+    //  busca cartão
     //
 
     const card =
@@ -73,7 +81,10 @@ export class InvoiceService {
       })
 
     if (!card) {
-      throw new Error('Card not found')
+      throw new AppError(
+        'Card not found',
+        404
+      )
     }
 
     //
@@ -177,8 +188,9 @@ export class InvoiceService {
       })
 
     if (!invoice) {
-      throw new Error(
-        'Invoice record not found'
+      throw new AppError(
+        'Invoice record not found',
+        404
       )
     }
 
@@ -221,7 +233,7 @@ export class InvoiceService {
       )
 
     //
-    // 👥 totais por usuário
+    //  totais por usuário
     //
 
     let totalsByUser: Record<

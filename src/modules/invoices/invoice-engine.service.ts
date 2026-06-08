@@ -4,7 +4,7 @@ import { prisma } from '../../infra/database/prisma.js'
 
 export class InvoiceEngineService {
 //
-// 🔥 garante existência da invoice
+//  garante existência da invoice
 //
 
 async ensureInvoiceExists(
@@ -44,7 +44,7 @@ return prisma.invoice.create({
 }
 
 //
-// 🔥 recalcula valor REAL da invoice
+//  recalcula valor REAL da invoice
 //
 
 async recalculateInvoiceTotal(
@@ -110,7 +110,7 @@ return prisma.invoice.update({
 }
 
 //
-// 🔥 sincroniza invoice
+//  sincroniza invoice
 //
 
 async syncInvoice(
