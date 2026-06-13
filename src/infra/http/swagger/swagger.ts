@@ -7,6 +7,10 @@ import fastifySwagger
 import fastifySwaggerUi
   from '@fastify/swagger-ui'
 
+import {
+  jsonSchemaTransform
+} from 'fastify-type-provider-zod'
+
 export async function setupSwagger(
   app: FastifyInstance
 ) {
@@ -14,85 +18,24 @@ export async function setupSwagger(
   // OPENAPI
   //
 
-  await app.register(
-    fastifySwagger,
-    {
-      openapi: {
-        openapi: '3.0.0',
+ await app.register(
+  fastifySwagger,
+  {
+    openapi: {
+      openapi: '3.0.0',
 
-        info: {
-          title: 'FaturaEasy',
-
-          description:
-            'API de gestão financeira multiusuário',
-
-          version: '1.0.0',
-        },
-
-        servers: [
-          {
-            url:
-              'http://localhost:3333',
-
-            description:
-              'Development server',
-          },
-        ],
-
-        tags: [
-          {
-            name: 'Auth',
-            description:
-              'Autenticação',
-          },
-
-          {
-            name: 'Users',
-            description:
-              'Usuários',
-          },
-
-          {
-            name: 'Cards',
-            description:
-              'Cartões',
-          },
-
-          {
-            name: 'Purchases',
-            description:
-              'Compras',
-          },
-
-          {
-            name: 'Invoices',
-            description:
-              'Faturas',
-          },
-
-          {
-            name: 'Payments',
-            description:
-              'Pagamentos',
-          },
-        ],
-
-        components: {
-          securitySchemes: {
-            bearerAuth: {
-              type: 'http',
-
-              scheme: 'bearer',
-
-              bearerFormat:
-                'JWT',
-            },
-          },
-        },
+      info: {
+        title: 'FaturaEasy',
+        description:
+          'API de gestão financeira multiusuário',
+        version: '1.0.0',
       },
-    }
-  )
+    },
 
+    transform:
+      jsonSchemaTransform,
+  }
+)
   //
   // SWAGGER UI
   //

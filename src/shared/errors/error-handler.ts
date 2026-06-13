@@ -4,9 +4,11 @@ import {
   FastifyRequest,
 } from 'fastify'
 
-import { ZodError } from 'zod'
+import { ZodError }
+  from 'zod'
 
-import { AppError } from './app-error.js'
+import { AppError }
+  from './app-error.js'
 
 export async function errorHandler(
   error: FastifyError | Error,
@@ -14,7 +16,7 @@ export async function errorHandler(
   reply: FastifyReply
 ) {
   //
-  // 🔥 APP ERROR
+  // APP ERROR
   //
 
   if (error instanceof AppError) {
@@ -32,35 +34,79 @@ export async function errorHandler(
 
         statusCode:
           error.statusCode,
+
+        fields:
+          error.details ?? null,
       },
     })
   }
 
   //
-  // 🔥 ZOD ERROR
+  // ZOD ERROR
   //
 
   if (error instanceof ZodError) {
-    return reply.status(422).send({
+  return reply.status(422).send({
+    success: false,
+
+    error: {
+      message:
+        'Validation error',
+
+      code:
+        'VALIDATION_ERROR',
+
+      statusCode: 422,
+
+      fields: error.issues.reduce(
+        (acc, issue) => {
+          const field =
+            issue.path.join('.')
+
+          if (!acc[field]) {
+            acc[field] = []
+          }
+
+          acc[field].push(
+            issue.message
+          )
+
+          return acc
+        },
+        {} as Record<
+          string,
+          string[]
+        >
+      ),
+    },
+  })
+}
+
+  //
+  // FASTIFY ERROR
+  //
+
+  if (
+    'statusCode' in error &&
+    error.statusCode === 400
+  ) {
+    return reply.status(400).send({
       success: false,
 
       error: {
         message:
-          'Validation error',
+          error.message,
 
         code:
-          'VALIDATION_ERROR',
+          'BAD_REQUEST',
 
-        statusCode: 422,
-
-        fields:
-          error.flatten().fieldErrors,
+        statusCode: 400,
       },
     })
   }
 
   //
-  // 🔥 INTERNAL ERROR
+  // INTERNAL
   //
 
   console.error(error)

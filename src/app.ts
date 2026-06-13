@@ -26,6 +26,12 @@ import { paymentRoutes }  from './modules/payments/payment.routes.js'
 
 import { setupSwagger }  from './infra/http/swagger/swagger.js'
 
+import { serializerCompiler }
+  from 'fastify-type-provider-zod'
+
+import { validatorCompiler }
+  from 'fastify-type-provider-zod'
+
 
 startScheduler()
 
@@ -33,6 +39,13 @@ export const app = Fastify({
   logger: true,
 })
 
+app.setValidatorCompiler(
+  validatorCompiler
+)
+
+app.setSerializerCompiler(
+  serializerCompiler
+)
 //
 // PLUGINS
 //

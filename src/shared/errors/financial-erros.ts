@@ -1,4 +1,5 @@
-import { AppError } from './app-error.js'
+import { AppError }
+  from './app-error.js'
 
 export class InvoiceClosedError
   extends AppError {
@@ -22,6 +23,19 @@ export class LimitExceededError
       message,
       409,
       'LIMIT_EXCEEDED'
+    )
+  }
+}
+
+export class InvoicePaidError
+  extends AppError {
+  constructor(
+    message = 'Invoice already paid'
+  ) {
+    super(
+      message,
+      409,
+      'INVOICE_PAID'
     )
   }
 }

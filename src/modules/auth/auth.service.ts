@@ -2,10 +2,17 @@
 
 import bcrypt from 'bcryptjs'
 
-import { prisma } from '../../infra/database/prisma.js'
+import { prisma }
+  from '../../infra/database/prisma.js'
 
 import { InvoiceCloseService }
   from '../invoices/invoice-close.service.js'
+
+import { ConflictError }
+  from '../../shared/errors/conflict-error.js'
+
+import { UnauthorizedError }
+  from '../../shared/errors/unauthorized-error.js'
 
 interface RegisterInput {
   name: string
@@ -22,7 +29,9 @@ export class AuthService {
   private invoiceCloseService =
     new InvoiceCloseService()
 
-  async register(data: RegisterInput) {
+  async register(
+    data: RegisterInput
+  ) {
     const userExists =
       await prisma.user.findUnique({
         where: {
@@ -31,7 +40,7 @@ export class AuthService {
       })
 
     if (userExists) {
-      throw new Error(
+      throw new ConflictError(
         'User already exists'
       )
     }
@@ -57,7 +66,9 @@ export class AuthService {
     return user
   }
 
-  async login(data: LoginInput) {
+  async login(
+    data: LoginInput
+  ) {
     const user =
       await prisma.user.findUnique({
         where: {
@@ -66,7 +77,7 @@ export class AuthService {
       })
 
     if (!user) {
-      throw new Error(
+      throw new UnauthorizedError(
         'Invalid credentials'
       )
     }
@@ -78,13 +89,13 @@ export class AuthService {
       )
 
     if (!passwordMatch) {
-      throw new Error(
+      throw new UnauthorizedError(
         'Invalid credentials'
       )
     }
 
     //
-    // 🔥 sincroniza fechamento automático
+    // sincroniza fechamento automático
     //
 
     await this.invoiceCloseService

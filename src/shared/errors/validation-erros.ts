@@ -1,14 +1,20 @@
-import { AppError } from './app-error.js'
+import { AppError }
+  from './app-error.js'
 
 export class ValidationError
   extends AppError {
+
   constructor(
-    message = 'Validation error'
+    details: Record<
+      string,
+      string[]
+    >
   ) {
     super(
-      message,
+      'Validation error',
       422,
-      'VALIDATION_ERROR'
+      'VALIDATION_ERROR',
+      details
     )
   }
 }
