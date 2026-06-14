@@ -8,37 +8,40 @@ import fastifySwaggerUi
   from '@fastify/swagger-ui'
 
 import {
-  jsonSchemaTransform
+  jsonSchemaTransform,
 } from 'fastify-type-provider-zod'
 
 export async function setupSwagger(
   app: FastifyInstance
 ) {
-  //
-  // OPENAPI
-  //
+  await app.register(
+    fastifySwagger,
+    {
+      openapi: {
+        openapi: '3.0.0',
 
- await app.register(
-  fastifySwagger,
-  {
-    openapi: {
-      openapi: '3.0.0',
+        info: {
+          title: 'FaturaEasy',
+          description:
+            'API de gestão financeira multiusuário',
+          version: '1.0.0',
+        },
 
-      info: {
-        title: 'FaturaEasy',
-        description:
-          'API de gestão financeira multiusuário',
-        version: '1.0.0',
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: 'http',
+              scheme: 'bearer',
+              bearerFormat: 'JWT',
+            },
+          },
+        },
       },
-    },
 
-    transform:
-      jsonSchemaTransform,
-  }
-)
-  //
-  // SWAGGER UI
-  //
+      transform:
+        jsonSchemaTransform,
+    }
+  )
 
   await app.register(
     fastifySwaggerUi,
@@ -46,9 +49,7 @@ export async function setupSwagger(
       routePrefix: '/docs',
 
       uiConfig: {
-        docExpansion:
-          'list',
-
+        docExpansion: 'list',
         deepLinking: false,
       },
     }

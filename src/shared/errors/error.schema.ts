@@ -21,7 +21,6 @@ export const errorResponseSchema =
             z.string(),
             z.array(z.string())
           )
-          .nullable()
           .optional(),
       }),
   })

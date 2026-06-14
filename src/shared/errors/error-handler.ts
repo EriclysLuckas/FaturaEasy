@@ -4,6 +4,10 @@ import {
   FastifyRequest,
 } from 'fastify'
 
+import {
+  hasZodFastifySchemaValidationErrors,
+} from 'fastify-type-provider-zod'
+
 import { ZodError }
   from 'zod'
 
@@ -15,14 +19,66 @@ export async function errorHandler(
   request: FastifyRequest,
   reply: FastifyReply
 ) {
+
+  //
+  // ZOD FIRST (Fastify + validatorCompiler)
+  //
+
+  if (
+    hasZodFastifySchemaValidationErrors(
+      error
+    )
+  ) {
+
+    const fields =
+      error.validation.reduce(
+        (acc, issue) => {
+
+          const field =
+            issue.instancePath
+              .replace('/', '')
+
+          if (!acc[field]) {
+            acc[field] = []
+          }
+
+          acc[field].push(
+            issue.message
+          )
+
+          return acc
+
+        },
+        {} as Record<
+          string,
+          string[]
+        >
+      )
+
+    return reply.status(422).send({
+      success: false,
+
+      error: {
+        message:
+          'Validation error',
+
+        code:
+          'VALIDATION_ERROR',
+
+        statusCode: 422,
+
+        fields,
+      },
+    })
+  }
+
   //
   // APP ERROR
   //
 
   if (error instanceof AppError) {
-    return reply.status(
-      error.statusCode
-    ).send({
+
+    const payload = {
       success: false,
 
       error: {
@@ -34,32 +90,34 @@ export async function errorHandler(
 
         statusCode:
           error.statusCode,
-
-        fields:
-          error.details ?? null,
       },
-    })
+    }
+
+    if (error.details) {
+      Object.assign(
+        payload.error,
+        {
+          fields:
+            error.details,
+        }
+      )
+    }
+
+    return reply
+      .status(error.statusCode)
+      .send(payload)
   }
 
   //
-  // ZOD ERROR
+  // ZOD ERROR (fallback)
   //
 
   if (error instanceof ZodError) {
-  return reply.status(422).send({
-    success: false,
 
-    error: {
-      message:
-        'Validation error',
-
-      code:
-        'VALIDATION_ERROR',
-
-      statusCode: 422,
-
-      fields: error.issues.reduce(
+    const fields =
+      error.issues.reduce(
         (acc, issue) => {
+
           const field =
             issue.path.join('.')
 
@@ -72,41 +130,33 @@ export async function errorHandler(
           )
 
           return acc
+
         },
         {} as Record<
           string,
           string[]
         >
-      ),
-    },
-  })
-}
+      )
 
-  //
-  // FASTIFY ERROR
-  //
-
-  if (
-    'statusCode' in error &&
-    error.statusCode === 400
-  ) {
-    return reply.status(400).send({
+    return reply.status(422).send({
       success: false,
 
       error: {
         message:
-          error.message,
+          'Validation error',
 
         code:
-          'BAD_REQUEST',
+          'VALIDATION_ERROR',
 
-        statusCode: 400,
+        statusCode: 422,
+
+        fields,
       },
     })
   }
 
   //
-  // INTERNAL
+  // INTERNAL ERROR
   //
 
   console.error(error)

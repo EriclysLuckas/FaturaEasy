@@ -22,6 +22,25 @@ export const loginSchema = z.object({
     .min(6, 'Password must have at least 6 characters'),
 })
 
+export const registerResponseSchema =
+  z.object({
+    id: z.string(),
+    name: z.string(),
+    email: z.string(),
+
+    
+  })
+
+export const loginResponseSchema =
+  z.object({
+    token: z.string(),
+    data:
+      z.object({
+        token:
+          z.string(),
+      }),
+  })
+
 export type RegisterInput =
   z.infer<typeof registerSchema>
 

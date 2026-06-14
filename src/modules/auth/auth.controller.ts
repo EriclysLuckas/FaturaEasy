@@ -29,7 +29,10 @@ export class AuthController {
 
     return reply
       .status(201)
-      .send(user)
+      .send({
+        success: true,
+        data: user,
+      })
   }
 
   async login(
@@ -48,9 +51,11 @@ export class AuthController {
       await reply.jwtSign({
         sub: user.id,
       })
-
     return reply.send({
-      token,
+      success: true,
+      data: {
+        token,
+      },
     })
   }
 }

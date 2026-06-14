@@ -1,13 +1,19 @@
 // src/modules/cards/card.service.ts
 
-import { prisma } from '../../infra/database/prisma.js'
-
-import { AppError }
-  from '../../shared/errors/app-error.js'
+import { prisma }
+  from '../../infra/database/prisma.js'
 
 import { PermissionService }
   from '../permissions/permissions.service.js'
 
+import { ForbiddenError }
+  from '../../shared/errors/forbidden-error.js'
+
+import { NotFoundError }
+  from '../../shared/errors/not-found-error.js'
+
+import { ConflictError }
+  from '../../shared/errors/conflict-error.js'
 const permissionService =
   new PermissionService()
 

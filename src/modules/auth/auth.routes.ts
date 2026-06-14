@@ -1,13 +1,25 @@
 import { FastifyInstance }
   from 'fastify'
 
+import { ZodTypeProvider }
+  from 'fastify-type-provider-zod'
+
 import { AuthController }
   from './auth.controller.js'
 
 import {
   loginSchema,
   registerSchema,
+  loginResponseSchema,
+  registerResponseSchema,
 } from './auth.schema.js'
+
+import {
+  unauthorizedResponseSchema,
+  validationResponseSchema,
+  conflictResponseSchema,
+  internalServerResponseSchema,
+} from '../../infra/http/swagger/response.schemas.js'
 
 const authController =
   new AuthController()
@@ -15,7 +27,14 @@ const authController =
 export async function authRoutes(
   app: FastifyInstance
 ) {
-  app.post(
+  const zodApp =
+    app.withTypeProvider<ZodTypeProvider>()
+
+  //
+  // REGISTER
+  //
+
+  zodApp.post(
     '/register',
     {
       schema: {
@@ -31,23 +50,17 @@ export async function authRoutes(
           registerSchema,
 
         response: {
-          201: {
-            type: 'object',
+          201:
+            registerResponseSchema,
 
-            properties: {
-              id: {
-                type: 'string',
-              },
+          409:
+            conflictResponseSchema,
 
-              name: {
-                type: 'string',
-              },
+          422:
+            validationResponseSchema,
 
-              email: {
-                type: 'string',
-              },
-            },
-          },
+          500:
+            internalServerResponseSchema,
         },
       },
     },
@@ -55,7 +68,11 @@ export async function authRoutes(
     authController.register
   )
 
-  app.post(
+  //
+  // LOGIN
+  //
+
+  zodApp.post(
     '/login',
     {
       schema: {
@@ -71,15 +88,17 @@ export async function authRoutes(
           loginSchema,
 
         response: {
-          200: {
-            type: 'object',
+          200:
+            loginResponseSchema,
 
-            properties: {
-              token: {
-                type: 'string',
-              },
-            },
-          },
+          401:
+            unauthorizedResponseSchema,
+
+          422:
+            validationResponseSchema,
+
+          500:
+            internalServerResponseSchema,
         },
       },
     },
