@@ -1,7 +1,6 @@
 // src/modules/cards/card.service.ts
 
-import { prisma }
-  from '../../infra/database/prisma.js'
+import { prisma } from '../../infra/database/prisma.js'
 
 import { PermissionService }
   from '../permissions/permissions.service.js'
@@ -14,6 +13,7 @@ import { NotFoundError }
 
 import { ConflictError }
   from '../../shared/errors/conflict-error.js'
+
 const permissionService =
   new PermissionService()
 
@@ -54,7 +54,7 @@ interface GetCardUsersInput {
 
 export class CardService {
   //
-  //  CRIAR CARTÃO
+  // CRIAR CARTÃO
   //
 
   async create(
@@ -62,10 +62,6 @@ export class CardService {
   ) {
     return prisma.$transaction(
       async (tx) => {
-        //
-        //  cria cartão
-        //
-
         const card =
           await tx.creditCard.create({
             data: {
@@ -77,21 +73,21 @@ export class CardService {
               closingDay:
                 data.closingDay,
 
-              dueDay: data.dueDay,
+              dueDay:
+                data.dueDay,
 
-              ownerId: data.ownerId,
+              ownerId:
+                data.ownerId,
             },
           })
 
-        //
-        //  owner também é usuário
-        //
-
         await tx.creditCardUser.create({
           data: {
-            userId: data.ownerId,
+            userId:
+              data.ownerId,
 
-            creditCardId: card.id,
+            creditCardId:
+              card.id,
 
             limitGranted:
               data.totalLimit,
@@ -104,16 +100,12 @@ export class CardService {
   }
 
   //
-  //  ADICIONAR USUÁRIO
+  // ADICIONAR USUÁRIO
   //
 
   async addUserToCard(
     data: AddUserToCardInput
   ) {
-    //
-    //  valida owner
-    //
-
     const isOwner =
       await permissionService.isCardOwner(
         data.ownerId,
@@ -121,15 +113,10 @@ export class CardService {
       )
 
     if (!isOwner) {
-      throw new AppError(
-        'Only owner can add users',
-        403
+      throw new ForbiddenError(
+        'Only owner can add users'
       )
     }
-
-    //
-    //  busca usuário
-    //
 
     const user =
       await prisma.user.findUnique({
@@ -139,26 +126,16 @@ export class CardService {
       })
 
     if (!user) {
-      throw new AppError(
-        'User not found',
-        404
+      throw new NotFoundError(
+        'User not found'
       )
     }
-
-    //
-    //  impede owner duplicado
-    //
 
     if (user.id === data.ownerId) {
-      throw new AppError(
-        'Owner already belongs to the card',
-        400
+      throw new ConflictError(
+        'Owner already belongs to the card'
       )
     }
-
-    //
-    //  verifica vínculo existente
-    //
 
     const existingLink =
       await prisma.creditCardUser.findUnique(
@@ -175,15 +152,10 @@ export class CardService {
       )
 
     if (existingLink) {
-      throw new AppError(
-        'User already linked to this card',
-        400
+      throw new ConflictError(
+        'User already linked to this card'
       )
     }
-
-    //
-    //  cria vínculo
-    //
 
     return prisma.creditCardUser.create({
       data: {
@@ -199,7 +171,7 @@ export class CardService {
   }
 
   //
-  //  LISTAR CARTÕES
+  // LISTAR CARTÕES
   //
 
   async listCards(userId: string) {
@@ -231,7 +203,8 @@ export class CardService {
       )
 
     return cards.map((item) => ({
-      id: item.creditCard.id,
+      id:
+        item.creditCard.id,
 
       name:
         item.creditCard.name,
@@ -241,8 +214,7 @@ export class CardService {
       ),
 
       closingDay:
-        item.creditCard
-          .closingDay,
+        item.creditCard.closingDay,
 
       dueDay:
         item.creditCard.dueDay,
@@ -257,7 +229,8 @@ export class CardService {
       users:
         item.creditCard.users.map(
           (link) => ({
-            id: link.user.id,
+            id:
+              link.user.id,
 
             name:
               link.user.name,
@@ -274,16 +247,12 @@ export class CardService {
   }
 
   //
-  //  BUSCAR CARTÃO
+  // BUSCAR CARTÃO
   //
 
   async getCardById(
     data: GetCardInput
   ) {
-    //
-    //  valida acesso
-    //
-
     const isCardUser =
       await permissionService.isCardUser(
         data.userId,
@@ -291,21 +260,17 @@ export class CardService {
       )
 
     if (!isCardUser) {
-      throw new AppError(
-        'Access denied',
-        403
+      throw new ForbiddenError(
+        'Access denied'
       )
     }
-
-    //
-    // busca cartão
-    //
 
     const card =
       await prisma.creditCard.findUnique(
         {
           where: {
-            id: data.creditCardId,
+            id:
+              data.creditCardId,
           },
 
           include: {
@@ -325,16 +290,17 @@ export class CardService {
       )
 
     if (!card) {
-      throw new AppError(
-        'Card not found',
-        404
+      throw new NotFoundError(
+        'Card not found'
       )
     }
 
     return {
-      id: card.id,
+      id:
+        card.id,
 
-      name: card.name,
+      name:
+        card.name,
 
       totalLimit: Number(
         card.totalLimit
@@ -343,39 +309,39 @@ export class CardService {
       closingDay:
         card.closingDay,
 
-      dueDay: card.dueDay,
+      dueDay:
+        card.dueDay,
 
-      ownerId: card.ownerId,
+      ownerId:
+        card.ownerId,
 
-      users: card.users.map(
-        (link) => ({
-          id: link.user.id,
+      users:
+        card.users.map(
+          (link) => ({
+            id:
+              link.user.id,
 
-          name:
-            link.user.name,
+            name:
+              link.user.name,
 
-          email:
-            link.user.email,
+            email:
+              link.user.email,
 
-          limitGranted: Number(
-            link.limitGranted
-          ),
-        })
-      ),
+            limitGranted: Number(
+              link.limitGranted
+            ),
+          })
+        ),
     }
   }
 
   //
-  //  ATUALIZAR CARTÃO
+  // ATUALIZAR CARTÃO
   //
 
   async updateCard(
     data: UpdateCardInput
   ) {
-    //
-    //  valida owner
-    //
-
     const isOwner =
       await permissionService.isCardOwner(
         data.ownerId,
@@ -383,41 +349,34 @@ export class CardService {
       )
 
     if (!isOwner) {
-      throw new AppError(
-        'Only owner can update card',
-        403
+      throw new ForbiddenError(
+        'Only owner can update card'
       )
     }
-
-    //
-    //  busca cartão
-    //
 
     const card =
       await prisma.creditCard.findUnique({
         where: {
-          id: data.creditCardId,
+          id:
+            data.creditCardId,
         },
       })
 
     if (!card) {
-      throw new AppError(
-        'Card not found',
-        404
+      throw new NotFoundError(
+        'Card not found'
       )
     }
 
-    //
-    //  atualiza
-    //
-
     return prisma.creditCard.update({
       where: {
-        id: data.creditCardId,
+        id:
+          data.creditCardId,
       },
 
       data: {
-        name: data.name,
+        name:
+          data.name,
 
         totalLimit:
           data.totalLimit,
@@ -425,22 +384,19 @@ export class CardService {
         closingDay:
           data.closingDay,
 
-        dueDay: data.dueDay,
+        dueDay:
+          data.dueDay,
       },
     })
   }
 
   //
-  //  USUÁRIOS DO CARTÃO
+  // USUÁRIOS DO CARTÃO
   //
 
   async getCardUsers(
     data: GetCardUsersInput
   ) {
-    //
-    // valida acesso
-    //
-
     const hasAccess =
       await permissionService.isCardUser(
         data.requesterId,
@@ -448,15 +404,10 @@ export class CardService {
       )
 
     if (!hasAccess) {
-      throw new AppError(
-        'Access denied',
-        403
+      throw new ForbiddenError(
+        'Access denied'
       )
     }
-
-    //
-    //  busca usuários
-    //
 
     const users =
       await prisma.creditCardUser.findMany(
@@ -486,11 +437,14 @@ export class CardService {
       )
 
     return users.map((link) => ({
-      userId: link.user.id,
+      userId:
+        link.user.id,
 
-      name: link.user.name,
+      name:
+        link.user.name,
 
-      email: link.user.email,
+      email:
+        link.user.email,
 
       limitGranted: Number(
         link.limitGranted

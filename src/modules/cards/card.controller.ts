@@ -5,7 +5,8 @@ import {
 
 import { z } from 'zod'
 
-import { CardService } from './card.service.js'
+import { CardService }
+  from './card.service.js'
 
 import {
   addUserToCardSchema,
@@ -17,6 +18,10 @@ const cardService =
   new CardService()
 
 export class CardController {
+  //
+  // CREATE CARD
+  //
+
   async create(
     request: FastifyRequest,
     reply: FastifyReply
@@ -37,8 +42,15 @@ export class CardController {
 
     return reply
       .status(201)
-      .send(card)
+      .send({
+        success: true,
+        data: card,
+      })
   }
+
+  //
+  // ADD USER TO CARD
+  //
 
   async addUser(
     request: FastifyRequest,
@@ -56,111 +68,144 @@ export class CardController {
       )
 
     const result =
-      await cardService.addUserToCard(
-        {
-          ownerId: String(
-            request.user.sub
-          ),
-          creditCardId:
-            params.cardId,
+      await cardService.addUserToCard({
+        ownerId: String(
+          request.user.sub
+        ),
 
-          userEmail:
-            body.userEmail,
+        creditCardId:
+          params.cardId,
 
-          limitGranted:
-            body.limitGranted,
-        }
-      )
-          console.log(request.user)
+        userEmail:
+          body.userEmail,
+
+        limitGranted:
+          body.limitGranted,
+      })
 
     return reply
       .status(201)
-      .send(result)
+      .send({
+        success: true,
+        data: result,
+      })
   }
+
+  //
+  // LIST CARDS
+  //
+
   async list(
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
-  const cards =
-    await cardService.listCards(
-      String(request.user.sub)
-    )
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) {
+    const cards =
+      await cardService.listCards(
+        String(
+          request.user.sub
+        )
+      )
 
-  return reply.send(cards)
-}
-
-async getById(
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
-  const params = z
-    .object({
-      cardId: z.string().uuid(),
+    return reply.send({
+      success: true,
+      data: cards,
     })
-    .parse(request.params)
+  }
 
-  const card =
-    await cardService.getCardById({
-      userId: String(
-        request.user.sub
-      ),
+  //
+  // GET CARD BY ID
+  //
 
-      creditCardId:
-        params.cardId,
+  async getById(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) {
+    const params = z
+      .object({
+        cardId: z.string().uuid(),
+      })
+      .parse(request.params)
+
+    const card =
+      await cardService.getCardById({
+        userId: String(
+          request.user.sub
+        ),
+
+        creditCardId:
+          params.cardId,
+      })
+
+    return reply.send({
+      success: true,
+      data: card,
     })
+  }
 
-  return reply.send(card)
-}
+  //
+  // UPDATE CARD
+  //
 
-async update(
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
-  const params = z
-    .object({
-      cardId: z.string().uuid(),
+  async update(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) {
+    const params = z
+      .object({
+        cardId: z.string().uuid(),
+      })
+      .parse(request.params)
+
+    const body =
+      updateCreditCardSchema.parse(
+        request.body
+      )
+
+    const card =
+      await cardService.updateCard({
+        ownerId: String(
+          request.user.sub
+        ),
+
+        creditCardId:
+          params.cardId,
+
+        ...body,
+      })
+
+    return reply.send({
+      success: true,
+      data: card,
     })
-    .parse(request.params)
+  }
 
-  const body =
-    updateCreditCardSchema.parse(
-      request.body
-    )
+  //
+  // CARD USERS
+  //
 
-  const card =
-    await cardService.updateCard({
-      ownerId: String(
-        request.user.sub
-      ),
+  async getUsers(
+    request: FastifyRequest,
+    reply: FastifyReply
+  ) {
+    const params = z
+      .object({
+        cardId: z.string().uuid(),
+      })
+      .parse(request.params)
 
-      creditCardId:
-        params.cardId,
+    const users =
+      await cardService.getCardUsers({
+        requesterId: String(
+          request.user.sub
+        ),
 
-      ...body,
+        creditCardId:
+          params.cardId,
+      })
+
+    return reply.send({
+      success: true,
+      data: users,
     })
-
-  return reply.send(card)
-}
-async getUsers(
-  request: FastifyRequest,
-  reply: FastifyReply
-) {
-  const params = z
-    .object({
-      cardId: z.string().uuid(),
-    })
-    .parse(request.params)
-
-  const users =
-    await cardService.getCardUsers({
-      requesterId: String(
-        request.user.sub
-      ),
-
-      creditCardId:
-        params.cardId,
-    })
-
-  return reply.send(users)
-}
+  }
 }

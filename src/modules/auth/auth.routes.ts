@@ -1,5 +1,4 @@
-import { FastifyInstance }
-  from 'fastify'
+import { FastifyInstance } from 'fastify'
 
 import { ZodTypeProvider }
   from 'fastify-type-provider-zod'
@@ -13,6 +12,10 @@ import {
   loginResponseSchema,
   registerResponseSchema,
 } from './auth.schema.js'
+
+import {
+  successResponseSchema,
+} from '../../infra/http/swagger/schemas/success.schemas.js'
 
 import {
   unauthorizedResponseSchema,
@@ -41,17 +44,19 @@ export async function authRoutes(
         tags: ['Auth'],
 
         summary:
-          'Cria uma nova conta',
+          'Criar conta',
 
         description:
-          'Realiza cadastro de usuário',
+          'Realiza o cadastro de um novo usuário',
 
         body:
           registerSchema,
 
         response: {
           201:
-            registerResponseSchema,
+            successResponseSchema(
+              registerResponseSchema
+            ),
 
           409:
             conflictResponseSchema,
@@ -79,17 +84,19 @@ export async function authRoutes(
         tags: ['Auth'],
 
         summary:
-          'Autentica usuário',
+          'Autenticar usuário',
 
         description:
-          'Retorna JWT',
+          'Retorna um JWT válido para acesso à API',
 
         body:
           loginSchema,
 
         response: {
           200:
-            loginResponseSchema,
+            successResponseSchema(
+              loginResponseSchema
+            ),
 
           401:
             unauthorizedResponseSchema,

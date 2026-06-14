@@ -34,11 +34,11 @@ export const registerResponseSchema =
 export const loginResponseSchema =
   z.object({
     token: z.string(),
-    data:
-      z.object({
-        token:
-          z.string(),
-      }),
+    // data:
+    //   z.object({
+    //     token:
+    //       z.string(),
+    //   }),
   })
 
 export type RegisterInput =
