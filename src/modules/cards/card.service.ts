@@ -57,109 +57,130 @@ export class CardService {
   // CRIAR CARTÃO
   //
 
-  async create(
-    data: CreateCreditCardInput
-  ) {
-    return prisma.$transaction(
-      async (tx) => {
-        const card =
-          await tx.creditCard.create({
-            data: {
-              name: data.name,
-
-              totalLimit:
-                data.totalLimit,
-
-              closingDay:
-                data.closingDay,
-
-              dueDay:
-                data.dueDay,
-
-              ownerId:
-                data.ownerId,
-            },
-          })
-
-        await tx.creditCardUser.create({
+ async create(
+  data: CreateCreditCardInput
+) {
+  return prisma.$transaction(
+    async (tx) => {
+      const card =
+        await tx.creditCard.create({
           data: {
-            userId:
-              data.ownerId,
+            name: data.name,
 
-            creditCardId:
-              card.id,
-
-            limitGranted:
+            totalLimit:
               data.totalLimit,
+
+            closingDay:
+              data.closingDay,
+
+            dueDay:
+              data.dueDay,
+
+            ownerId:
+              data.ownerId,
           },
         })
 
-        return card
+      await tx.creditCardUser.create({
+        data: {
+          userId:
+            data.ownerId,
+
+          creditCardId:
+            card.id,
+
+          limitGranted:
+            data.totalLimit,
+        },
+      })
+
+      return {
+        id:
+          card.id,
+
+        name:
+          card.name,
+
+        totalLimit: Number(
+          card.totalLimit
+        ),
+
+        closingDay:
+          card.closingDay,
+
+        dueDay:
+          card.dueDay,
+
+        ownerId:
+          card.ownerId,
       }
-    )
-  }
+    }
+  )
+}
 
   //
   // ADICIONAR USUÁRIO
   //
 
-  async addUserToCard(
-    data: AddUserToCardInput
-  ) {
-    const isOwner =
-      await permissionService.isCardOwner(
-        data.ownerId,
-        data.creditCardId
-      )
+async addUserToCard(
+  data: AddUserToCardInput
+) {
+  const isOwner =
+    await permissionService.isCardOwner(
+      data.ownerId,
+      data.creditCardId
+    )
 
-    if (!isOwner) {
-      throw new ForbiddenError(
-        'Only owner can add users'
-      )
-    }
+  if (!isOwner) {
+    throw new ForbiddenError(
+      'Only owner can add users'
+    )
+  }
 
-    const user =
-      await prisma.user.findUnique({
+  const user =
+    await prisma.user.findUnique({
+      where: {
+        email: data.userEmail,
+      },
+    })
+
+  if (!user) {
+    throw new NotFoundError(
+      'User not found'
+    )
+  }
+
+  if (user.id === data.ownerId) {
+    throw new ConflictError(
+      'Owner already belongs to the card'
+    )
+  }
+
+  const existingLink =
+    await prisma.creditCardUser.findUnique(
+      {
         where: {
-          email: data.userEmail,
-        },
-      })
+          userId_creditCardId: {
+            userId: user.id,
 
-    if (!user) {
-      throw new NotFoundError(
-        'User not found'
-      )
-    }
-
-    if (user.id === data.ownerId) {
-      throw new ConflictError(
-        'Owner already belongs to the card'
-      )
-    }
-
-    const existingLink =
-      await prisma.creditCardUser.findUnique(
-        {
-          where: {
-            userId_creditCardId: {
-              userId: user.id,
-
-              creditCardId:
-                data.creditCardId,
-            },
+            creditCardId:
+              data.creditCardId,
           },
-        }
-      )
+        },
+      }
+    )
 
-    if (existingLink) {
-      throw new ConflictError(
-        'User already linked to this card'
-      )
-    }
+  if (existingLink) {
+    throw new ConflictError(
+      'User already linked to this card'
+    )
+  }
 
-    return prisma.creditCardUser.create({
+  const link =
+    await prisma.creditCardUser.create({
       data: {
-        userId: user.id,
+        userId:
+          user.id,
 
         creditCardId:
           data.creditCardId,
@@ -168,7 +189,19 @@ export class CardService {
           data.limitGranted,
       },
     })
+
+  return {
+    userId:
+      link.userId,
+
+    creditCardId:
+      link.creditCardId,
+
+    limitGranted: Number(
+      link.limitGranted
+    ),
   }
+}
 
   //
   // LISTAR CARTÕES
@@ -357,8 +390,7 @@ export class CardService {
     const card =
       await prisma.creditCard.findUnique({
         where: {
-          id:
-            data.creditCardId,
+          id: data.creditCardId,
         },
       })
 
@@ -368,26 +400,39 @@ export class CardService {
       )
     }
 
-    return prisma.creditCard.update({
-      where: {
-        id:
-          data.creditCardId,
-      },
+    const updatedCard =
+      await prisma.creditCard.update({
+        where: {
+          id: data.creditCardId,
+        },
 
-      data: {
-        name:
-          data.name,
+        data: {
+          name: data.name,
+          totalLimit: data.totalLimit,
+          closingDay: data.closingDay,
+          dueDay: data.dueDay,
+        },
+      })
 
-        totalLimit:
-          data.totalLimit,
+    return {
+      id: updatedCard.id,
 
-        closingDay:
-          data.closingDay,
+      name: updatedCard.name,
 
-        dueDay:
-          data.dueDay,
-      },
-    })
+      totalLimit: Number(
+        updatedCard.totalLimit
+      ),
+
+      closingDay:
+        updatedCard.closingDay,
+
+      dueDay:
+        updatedCard.dueDay,
+
+      ownerId:
+        updatedCard.ownerId,
+    }
+    
   }
 
   //
