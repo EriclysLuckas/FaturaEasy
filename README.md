@@ -1,5 +1,9 @@
 # 💳 Fatura Easy
 
+<p align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f172a,100:2563eb&height=180&section=header&text=Fatura%20Easy&fontSize=40&fontColor=ffffff" />
+</p>
+
 <p align="left">
 
 <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" />
@@ -28,6 +32,28 @@ Além de atender uma necessidade pessoal e familiar, o sistema faz parte do meu 
 
 ---
 
+## 🧩 Arquitetura do Sistema
+
+flowchart TD
+    User --> Purchase
+    Purchase --> Installments
+    Installments --> Invoice
+    Invoice --> Lifecycle
+    Invoice --> Payment
+    Payment --> CreditLimit
+
+---
+
+## 🧠 Decisões de Arquitetura
+
+- Purchase é a fonte da verdade financeira
+- Invoice é uma projeção agregada por competência
+- Parcelas são entidades independentes para garantir consistência
+- Evita duplicidade de estado entre compra e fatura
+- Sistema prioriza consistência em vez de performance prematura
+
+---
+
 # 🚀 Principais Funcionalidades
 
 ## 👥 Compartilhamento de Cartões
@@ -36,6 +62,17 @@ Além de atender uma necessidade pessoal e familiar, o sistema faz parte do meu 
 - Múltiplos usuários vinculados
 - Controle de limite individual por usuário
 - Controle de limite global do cartão
+
+---
+
+## ⭐ Diferenciais do Projeto
+
+- Engine financeira própria para parcelamento
+- Controle de limites individual e global
+- Lifecycle completo de faturas (OPEN → CLOSED → PAID)
+- Automação de processos com cron jobs
+- Modelagem orientada ao domínio (DDD inspirado)
+- Estrutura pronta para evolução para fintech-like system
 
 ---
 
@@ -212,24 +249,44 @@ As invoices funcionam como projeções organizadas da dívida por competência, 
 
 ---
 
+
+
+
+
 # 🚀 Como Executar
 
 ## Clone o repositório
 
 ```bash
 git clone <repo-url>
+```
 Instale as dependências
+
+```bash
 npm install
+```
 Configure o .env
+
+```bash
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/fatura_easy?schema=public"
 
+
 JWT_SECRET="seu_secret_super_seguro"
+```
+
 Suba a infraestrutura
+```bash
 docker-compose up -d
+```
 Execute as migrations
+```bash
 npx prisma migrate dev
+```
 Inicie a aplicação
+```bash
 npm run dev
+```
+
 🎯 Aprendizados
 
 Durante o desenvolvimento deste projeto foram explorados:
@@ -242,7 +299,11 @@ Controle de estados
 APIs REST
 Documentação com Swagger
 Containerização com Docker
-📌 Status do Projeto
+
+## 📌 Status do Projeto
+
+
 
 Em desenvolvimento ativo e evoluindo conforme necessidades reais de uso após deploy.
-Novas funcionalidades serão  implementadas com foco em resolver problemas reais de gestão financeira compartilhada.
+
+Novas funcionalidades serão implementadas com foco em resolver problemas reais de gestão financeira compartilhada.
