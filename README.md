@@ -217,4 +217,5 @@ npm run dev
 
 # 📌 Objetivo do Projeto
 
-O objetivo do projeto é aprofundar conhecimentos em engenharia backend através da modelagem de regras financeiras reais, explorando arquitetura, automação de processos e consistência de dados em sistemas orientados a domínio.
+Desenvolvido para solucionar um problema real de controle de faturas compartilhadas em cartões de crédito, este projeto centraliza gastos, limites e responsabilidades financeiras de múltiplos usuários.
+Além de atender uma necessidade pessoal, o sistema compõe meu portfólio backend, evidenciando conhecimentos em arquitetura de software, modelagem de domínio e automação de processos financeiros.
