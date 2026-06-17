@@ -181,6 +181,35 @@ Representa a projeção financeira das parcelas agrupadas por competência (mês
 
 ---
 
+## Estrutura do Projeto
+
+```text
+src
+├─ @types        # Tipagens globais
+├─ config        # Configurações da aplicação
+├─ infra         # Prisma, banco, providers
+├─ jobs          # Cron jobs financeiros
+├─ modules       # Regras de negócio organizadas por domínio
+├─ routes        # Registro central de rotas
+├─ shared        # Utilitários e componentes compartilhados
+└─ tests         # Testes automatizados
+```
+
+---
+
+### Exemplo de módulo
+
+```text
+modules
+└─ auth
+   ├─ auth.controller.ts
+   ├─ auth.routes.ts
+   ├─ auth.schema.ts
+   └─ auth.service.ts
+```
+
+---
+
 ## Conceito Central
 
 A arquitetura foi construída considerando a entidade **Purchase** como origem da verdade financeira.
