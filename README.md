@@ -4,7 +4,7 @@
   <img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f172a,100:2563eb&height=180&section=header&text=Fatura%20Easy&fontSize=40&fontColor=ffffff" />
 </p>
 
-<p align="left">
+<p align="center">
 
 <img src="https://img.shields.io/badge/Node.js-339933?style=for-the-badge&logo=nodedotjs&logoColor=white" />
 <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" />
@@ -24,178 +24,131 @@ Mais do que um CRUD tradicional, o projeto evoluiu para uma pequena engine finan
 
 ---
 
+# 📑 Sumário
+
+* Objetivo do Projeto
+* Problema Resolvido
+* Arquitetura e Modelagem
+* Funcionalidades
+* Regras de Negócio
+* Documentação da API
+* Stack Utilizada
+* Infraestrutura
+* Roadmap
+* Como Executar
+* Aprendizados
+
+---
+
 # 📌 Objetivo do Projeto
 
 Desenvolvido para solucionar um problema real de controle de faturas compartilhadas em cartões de crédito, este projeto centraliza gastos, limites e responsabilidades financeiras de múltiplos usuários.
 
-Além de atender uma necessidade pessoal e familiar, o sistema faz parte do meu portfólio como desenvolvedor backend, demonstrando conhecimentos em modelagem de domínio, arquitetura de software, automação de processos e consistência de dados.
+Além de atender uma necessidade pessoal e familiar, o sistema faz parte do meu portfólio como desenvolvedor backend, demonstrando conhecimentos em:
+
+* Modelagem de domínio
+* Arquitetura de software
+* Consistência de dados
+* Automação de processos
+* APIs REST
+* Containerização
 
 ---
 
-## 🧩 Arquitetura do Sistema
+# 🎯 Problema Resolvido
 
-flowchart TD
-    User --> Purchase
-    Purchase --> Installments
-    Installments --> Invoice
-    Invoice --> Lifecycle
-    Invoice --> Payment
-    Payment --> CreditLimit
+Em cenários onde um mesmo cartão é utilizado por múltiplas pessoas, torna-se difícil controlar:
 
----
+* Quem realizou cada compra
+* Quanto cada usuário consumiu do limite
+* Quais parcelas pertencem a cada pessoa
+* Quanto ainda está pendente de pagamento
+* Qual o valor real disponível do cartão
 
-## 🧠 Decisões de Arquitetura
-
-- Purchase é a fonte da verdade financeira
-- Invoice é uma projeção agregada por competência
-- Parcelas são entidades independentes para garantir consistência
-- Evita duplicidade de estado entre compra e fatura
-- Sistema prioriza consistência em vez de performance prematura
-
----
-
-# 🚀 Principais Funcionalidades
-
-## 👥 Compartilhamento de Cartões
-
-- Cartão com owner principal
-- Múltiplos usuários vinculados
-- Controle de limite individual por usuário
-- Controle de limite global do cartão
-
----
-
-## ⭐ Diferenciais do Projeto
-
-- Engine financeira própria para parcelamento
-- Controle de limites individual e global
-- Lifecycle completo de faturas (OPEN → CLOSED → PAID)
-- Automação de processos com cron jobs
-- Modelagem orientada ao domínio (DDD inspirado)
-- Estrutura pronta para evolução para fintech-like system
-
----
-
-## 💳 Gestão Financeira de Compras
-
-- Registro de compras parceladas
-- Geração automática de parcelas
-- Distribuição automática por competência
-- Correção de diferenças decimais em parcelamentos
-
-### Exemplo
-
-Compra de R$ 300,00 em 4x:
-
-- Junho → R$ 75,00
-- Julho → R$ 75,00
-- Agosto → R$ 75,00
-- Setembro → R$ 75,00
-
----
-
-## 📄 Invoice Engine
-
-Cada invoice representa a composição financeira de:
-
-
-Cartão + Mês + Ano
-
-
-Exemplo:
-
-
-Nubank — 06/2026
-Nubank — 07/2026
-
-
----
-
-## 🔄 Lifecycle de Faturas
-
-| Status | Descrição |
-|------|------------|
-| OPEN | Aceita novas compras |
-| CLOSED | Fatura congelada para alterações |
-| PAID | Libera automaticamente o limite utilizado |
-
----
-
-## ⏰ Automação Financeira
-
-Rotinas automatizadas utilizando `node-cron`:
-
-- Fechamento automático de invoices
-- Atualização de status financeiros
-- Sincronização do lifecycle das faturas
-
----
-
-# 🧠 Regras de Negócio Implementadas
-
-- Controle de limite individual
-- Controle de limite global
-- Competência automática de fatura
-- Parcelamento consistente
-- Correção de diferenças decimais
-- Invoice única por competência
-- Freeze financeiro após fechamento
-- Liberação automática de limite após pagamento
-- Sincronização transacional de pagamentos
+O Fatura Easy centraliza essas informações e automatiza a gestão financeira compartilhada.
 
 ---
 
 # 🏗️ Arquitetura e Modelagem
 
-## Entidades Principais
+## 🧩 Arquitetura do Sistema
 
+```mermaid
+flowchart TD
 
+User --> Purchase
+Purchase --> PurchaseInstallment
+PurchaseInstallment --> Invoice
+Invoice --> Payment
+Payment --> CreditLimit
+```
+
+---
+
+## 🔄 Fluxo do Domínio
+
+```text
+Purchase
+│
+├── PurchaseInstallments
+│
+└──► Invoice
+        │
+        └──► Payment
+```
+
+---
+
+## 📦 Entidades Principais
+
+```text
 User
 CreditCard
 CreditCardUser
 Purchase
 PurchaseInstallment
 Invoice
+```
 
+### User
 
----
+Usuário autenticado do sistema.
 
-## Fluxo do Domínio
+### CreditCard
 
+Cartão compartilhado entre múltiplos usuários.
 
-Purchase
-│
-├── PurchaseInstallments
-│
-└──► Invoice
+### CreditCardUser
 
+Relacionamento entre usuário e cartão, incluindo regras de limite individual.
 
 ### Purchase
+
 Representa a compra original realizada pelo usuário.
 
 ### PurchaseInstallment
+
 Representa cada parcela gerada a partir de uma compra.
 
 ### Invoice
+
 Representa a projeção financeira das parcelas agrupadas por competência (mês/ano).
 
 ---
 
-## Estrutura do Projeto
+## 📂 Estrutura do Projeto
 
 ```text
 src
-├─ @types        # Tipagens globais
-├─ config        # Configurações da aplicação
-├─ infra         # Prisma, banco, providers
-├─ jobs          # Cron jobs financeiros
-├─ modules       # Regras de negócio organizadas por domínio
-├─ routes        # Registro central de rotas
-├─ shared        # Utilitários e componentes compartilhados
-└─ tests         # Testes automatizados
+├─ @types
+├─ config
+├─ infra
+├─ jobs
+├─ modules
+├─ routes
+├─ shared
+└─ tests
 ```
-
----
 
 ### Exemplo de módulo
 
@@ -210,7 +163,18 @@ modules
 
 ---
 
-## Conceito Central
+## 🧠 Decisões de Arquitetura
+
+* Purchase é a fonte da verdade financeira
+* Invoice é uma projeção agregada por competência
+* Parcelas são entidades independentes
+* Evita duplicidade de estado financeiro
+* Invoice única por competência
+* Sistema prioriza consistência antes de otimizações prematuras
+
+---
+
+## 🎯 Conceito Central
 
 A arquitetura foi construída considerando a entidade **Purchase** como origem da verdade financeira.
 
@@ -218,69 +182,185 @@ As invoices funcionam como projeções organizadas da dívida por competência, 
 
 ---
 
+# 🚀 Principais Funcionalidades
+
+## 👥 Compartilhamento de Cartões
+
+* Cartão com owner principal
+* Múltiplos usuários vinculados
+* Controle de limite individual
+* Controle de limite global
+
+---
+
+## 💳 Gestão Financeira de Compras
+
+* Registro de compras parceladas
+* Geração automática de parcelas
+* Distribuição por competência
+* Correção de diferenças decimais
+
+### Exemplo
+
+Compra de R$ 300,00 em 4x
+
+```text
+Junho      → R$ 75,00
+Julho      → R$ 75,00
+Agosto     → R$ 75,00
+Setembro   → R$ 75,00
+```
+
+---
+
+## 📄 Invoice Engine
+
+Cada invoice representa:
+
+```text
+Cartão + Mês + Ano
+```
+
+Exemplo:
+
+```text
+Nubank - 06/2026
+Nubank - 07/2026
+```
+
+---
+
+## 🔄 Lifecycle de Faturas
+
+| Status | Descrição                                 |
+| ------ | ----------------------------------------- |
+| OPEN   | Aceita novas compras                      |
+| CLOSED | Fatura congelada para alterações          |
+| PAID   | Libera automaticamente o limite utilizado |
+
+---
+
+## ⏰ Automação Financeira
+
+Rotinas automatizadas utilizando node-cron:
+
+* Fechamento automático de invoices
+* Atualização de status financeiros
+* Sincronização do lifecycle
+* Processos financeiros agendados
+
+---
+
+## ⭐ Diferenciais do Projeto
+
+* Engine financeira própria para parcelamento
+* Controle de limite individual e global
+* Lifecycle completo de invoices
+* Automação financeira com cron jobs
+* Modelagem orientada ao domínio
+* Estrutura preparada para evolução futura
+
+---
+
+# 🧠 Regras de Negócio Implementadas
+
+* Controle de limite individual
+* Controle de limite global
+* Competência automática de invoice
+* Parcelamento consistente
+* Correção de diferenças decimais
+* Invoice única por competência
+* Freeze financeiro após fechamento
+* Liberação automática de limite após pagamento
+* Sincronização transacional de pagamentos
+
+---
+
+# 📚 Documentação da API
+
+A API possui documentação completa utilizando Swagger/OpenAPI.
+
+### Swagger
+
+```text
+Adicionar imagem aqui:
+
+docs/swagger.png
+```
+
+Exemplo:
+
+```markdown
+![Swagger](./docs/swagger.png)
+```
+
+---
+
 # 🛠️ Stack Utilizada
 
 ## Backend
 
-- Node.js
-- TypeScript
-- Fastify
-- Prisma ORM
-- PostgreSQL
-- Zod
+* Node.js
+* TypeScript
+* Fastify
+* Prisma ORM
+* PostgreSQL
+* Zod
 
 ## Infraestrutura
 
-- Docker
-- JWT Authentication
-- node-cron
-- Swagger/OpenAPI
+* Docker
+* JWT Authentication
+* node-cron
+* Swagger/OpenAPI
 
 ---
 
 # 📦 Infraestrutura Implementada
 
-- API containerizada
-- PostgreSQL persistente
-- Variáveis de ambiente
-- Middleware JWT
-- Swagger/OpenAPI
-- Padronização global de erros
-- Health Check endpoint
+* API containerizada
+* PostgreSQL persistente
+* Variáveis de ambiente
+* Middleware JWT
+* Swagger/OpenAPI
+* Padronização global de erros
+* Health Check Endpoint
 
 ---
 
 # 📈 Roadmap
 
-## Concluído
+## ✅ Concluído
 
-- Autenticação JWT
-- Compartilhamento de cartões
-- Controle de limites
-- Parcelamento automático
-- Invoice Engine
-- Cron Jobs financeiros
-- Swagger/OpenAPI
-- Padronização global de erros
-
-## Em Desenvolvimento
-
-- Testes automatizados com Jest
-- Dashboard financeiro
-- Aplicativo mobile com React Native
-
-## Futuro
-
-- Audit Trail financeiro
-- Estornos de compras
-- Pagamentos parciais
-- Ledger financeiro
+* Autenticação JWT
+* Compartilhamento de cartões
+* Controle de limites
+* Parcelamento automático
+* Invoice Engine
+* Cron Jobs financeiros
+* Swagger/OpenAPI
+* Padronização global de erros
 
 ---
 
+## 🚧 Em Desenvolvimento
 
+* Testes automatizados com Jest
+* Dashboard financeiro
+* Aplicativo mobile com React Native
 
+---
 
+## 🔮 Futuro
+
+* Audit Trail financeiro
+* Estornos de compras
+* Pagamentos parciais
+* Ledger financeiro
+* Eventos de domínio
+* Observabilidade e métricas
+
+---
 
 # 🚀 Como Executar
 
@@ -289,50 +369,60 @@ As invoices funcionam como projeções organizadas da dívida por competência, 
 ```bash
 git clone <repo-url>
 ```
-Instale as dependências
+
+## Instale as dependências
 
 ```bash
 npm install
 ```
-Configure o .env
 
-```bash
+## Configure o .env
+
+```env
 DATABASE_URL="postgresql://usuario:senha@localhost:5432/fatura_easy?schema=public"
-
 
 JWT_SECRET="seu_secret_super_seguro"
 ```
 
-Suba a infraestrutura
+## Suba a infraestrutura
+
 ```bash
 docker-compose up -d
 ```
-Execute as migrations
+
+## Execute as migrations
+
 ```bash
 npx prisma migrate dev
 ```
-Inicie a aplicação
+
+## Inicie a aplicação
+
 ```bash
 npm run dev
 ```
 
-🎯 Aprendizados
+---
+
+# 🎯 Aprendizados
 
 Durante o desenvolvimento deste projeto foram explorados:
 
-Modelagem de domínio
-Consistência financeira
-Arquitetura backend
-Automação de processos
-Controle de estados
-APIs REST
-Documentação com Swagger
-Containerização com Docker
+* Modelagem de domínio
+* Consistência financeira
+* Arquitetura backend
+* Controle de estados
+* Automação de processos
+* APIs REST
+* Swagger/OpenAPI
+* Docker
+* PostgreSQL
+* Prisma ORM
 
-## 📌 Status do Projeto
+---
 
+# 📌 Status do Projeto
 
-
-Em desenvolvimento ativo e evoluindo conforme necessidades reais de uso após deploy.
+Projeto em desenvolvimento ativo e evoluindo conforme necessidades reais de uso após deploy.
 
 Novas funcionalidades serão implementadas com foco em resolver problemas reais de gestão financeira compartilhada.
