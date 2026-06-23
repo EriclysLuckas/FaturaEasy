@@ -1,8 +1,22 @@
-import { prisma } from '../../infra/database/prisma.js'
+import { prisma }
+  from '../../infra/database/prisma.js'
 
-import { PermissionService } from '../permissions/permissions.service.js'
+import { PermissionService }
+  from '../permissions/permissions.service.js'
 
-import { InvoiceLifecycleService } from '../invoices/invoice-lifecycle.service.js'
+import { InvoiceLifecycleService }
+  from '../invoices/invoice-lifecycle.service.js'
+
+import { NotFoundError }
+  from '../../shared/errors/not-found-error.js'
+
+import { ForbiddenError }
+  from '../../shared/errors/forbidden-error.js'
+
+import {
+  InvoiceNotClosedError,
+  NoPendingInstallmentsError,
+} from '../../shared/errors/financial-erros.js'
 
 interface PayInvoiceInput {
   invoiceId: string
@@ -38,7 +52,7 @@ export class PaymentService {
       })
 
     if (!invoice) {
-      throw new Error(
+      throw new NotFoundError(
         'Invoice not found'
       )
     }
@@ -50,14 +64,10 @@ export class PaymentService {
       )
 
     if (!isOwner) {
-      throw new Error(
+      throw new ForbiddenError(
         'Only owner can pay invoice'
       )
     }
-
-    //
-    //  STATUS DINÂMICO
-    //
 
     const calculatedStatus =
       this.invoiceLifecycleService.getInvoiceStatus(
@@ -80,18 +90,14 @@ export class PaymentService {
         }
       )
 
-    if (calculatedStatus !== 'CLOSED') {
-      throw new Error(
-        'Invoice must be CLOSED before payment'
-      )
+    if (
+      calculatedStatus !== 'CLOSED'
+    ) {
+      throw new InvoiceNotClosedError()
     }
 
     return prisma.$transaction(
       async (tx) => {
-        //
-        //  PARCELAS PENDENTES
-        //
-
         const pendingInstallments =
           await tx.purchaseInstallment.findMany(
             {
@@ -102,7 +108,8 @@ export class PaymentService {
                 competenceYear:
                   invoice.year,
 
-                status: 'PENDING',
+                status:
+                  'PENDING',
 
                 purchase: {
                   creditCardId:
@@ -120,28 +127,21 @@ export class PaymentService {
         if (
           pendingInstallments.length === 0
         ) {
-          throw new Error(
-            'No pending installments'
-          )
+          throw new NoPendingInstallmentsError()
         }
-
-        //
-        //  TOTAL REAL
-        //
 
         const totalPaid =
           pendingInstallments.reduce(
-            (acc, installment) =>
+            (
+              acc,
+              installment
+            ) =>
               acc +
               Number(
                 installment.amount
               ),
             0
           )
-
-        //
-        //  MARCA PARCELAS COMO PAGAS
-        //
 
         await tx.purchaseInstallment.updateMany(
           {
@@ -163,10 +163,6 @@ export class PaymentService {
           }
         )
 
-        //
-        //  ATUALIZA FATURA
-        //
-
         const updatedInvoice =
           await tx.invoice.update({
             where: {
@@ -176,7 +172,8 @@ export class PaymentService {
             data: {
               status: 'PAID',
 
-              paidAt: new Date(),
+              paidAt:
+                new Date(),
             },
           })
 
@@ -187,7 +184,8 @@ export class PaymentService {
             'Invoice paid successfully',
 
           invoice: {
-            id: updatedInvoice.id,
+            id:
+              updatedInvoice.id,
 
             status:
               updatedInvoice.status,

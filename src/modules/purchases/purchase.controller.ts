@@ -3,11 +3,13 @@ import {
   FastifyRequest,
 } from 'fastify'
 
-import { PurchaseService } from './purchase.service.js'
+import { PurchaseService }
+  from './purchase.service.js'
 
 import {
   createPurchaseSchema,
-  purchaseIdSchema,
+  purchaseIdParamsSchema,
+  listPurchasesQuerySchema,
 } from './purchase.schemas.js'
 
 const purchaseService =
@@ -18,7 +20,7 @@ export class PurchaseController {
   // CREATE
   //
 
-  async create(
+   async create(
     request: FastifyRequest,
     reply: FastifyReply
   ) {
@@ -38,7 +40,17 @@ export class PurchaseController {
 
     return reply
       .status(201)
-      .send(purchase)
+      .send({
+        success: true,
+
+        data: {
+          ...purchase,
+
+          amount: Number(
+            purchase.amount
+          ),
+        },
+      })
   }
 
   //
@@ -49,17 +61,32 @@ export class PurchaseController {
     request: FastifyRequest,
     reply: FastifyReply
   ) {
-    const query = purchaseIdSchema.parse(
-      request.params
-    )
-
-    const purchases =
-      await purchaseService.listByCard(
-        query.id,
-        String(request.user.sub)
+    const query =
+      listPurchasesQuerySchema.parse(
+        request.query
       )
 
-    return reply.send(purchases)
+    const purchases =
+      await purchaseService.list({
+        userId: String(
+          request.user.sub
+        ),
+
+        creditCardId:
+          query.creditCardId,
+
+        month:
+          query.month,
+
+        year:
+          query.year,
+      })
+
+    return reply.send({
+      success: true,
+
+      data: purchases,
+    })
   }
 
   //
@@ -71,7 +98,7 @@ export class PurchaseController {
     reply: FastifyReply
   ) {
     const params =
-      purchaseIdSchema.parse(
+      purchaseIdParamsSchema.parse(
         request.params
       )
 
@@ -84,7 +111,11 @@ export class PurchaseController {
         ),
       })
 
-    return reply.send(purchase)
+    return reply.send({
+      success: true,
+
+      data: purchase,
+    })
   }
 
   //
@@ -96,7 +127,7 @@ export class PurchaseController {
     reply: FastifyReply
   ) {
     const params =
-      purchaseIdSchema.parse(
+      purchaseIdParamsSchema.parse(
         request.params
       )
 
@@ -109,6 +140,10 @@ export class PurchaseController {
         ),
       })
 
-    return reply.send(result)
+    return reply.send({
+      success: true,
+
+      data: result,
+    })
   }
 }

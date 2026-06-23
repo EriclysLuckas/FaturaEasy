@@ -5,36 +5,29 @@ import {
   FastifyRequest,
 } from 'fastify'
 
-import { z } from 'zod'
+import { InvoiceService }
+  from './invoice.service.js'
 
-import { InvoiceService } from './invoice.service.js'
-import { InvoiceCloseService } from './invoice-close.service.js'
-
-const invoiceCloseService =
-  new InvoiceCloseService()
+import {
+  getInvoiceParamsSchema,
+} from './invoice.schemas.js'
 
 const invoiceService =
   new InvoiceService()
 
 export class InvoiceController {
+  //
+  // GET INVOICE
+  //
+
   async getInvoice(
     request: FastifyRequest,
     reply: FastifyReply
   ) {
-    const params = z
-      .object({
-        cardId: z.string().uuid(),
-
-        month: z.coerce
-          .number()
-          .min(1)
-          .max(12),
-
-        year: z.coerce
-          .number()
-          .min(2020),
-      })
-      .parse(request.params)
+    const params =
+      getInvoiceParamsSchema.parse(
+        request.params
+      )
 
     const invoice =
       await invoiceService.getInvoice({
@@ -50,44 +43,12 @@ export class InvoiceController {
         year: params.year,
       })
 
-    return reply.send(invoice)
-  }
+    return reply
+      .status(200)
+      .send({
+        success: true,
 
-
-   //
-  //  FECHAR FATURA
-  //
-
-  async closeInvoice(
-    request: FastifyRequest<{
-      Params: {
-        creditCardId: string
-        month: string
-        year: string
-      }
-    }>,
-    reply: FastifyReply
-  ) {
-    const { creditCardId } =
-      request.params
-
-    const month = Number(
-      request.params.month
-    )
-
-    const year = Number(
-      request.params.year
-    )
-
-    const result =
-      await invoiceCloseService.closeInvoice(
-        creditCardId,
-        month,
-        year
-      )
-
-    return reply.send(result)
+        data: invoice,
+      })
   }
 }
-
-

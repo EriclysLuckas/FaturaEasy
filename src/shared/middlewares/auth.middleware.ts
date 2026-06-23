@@ -11,7 +11,17 @@ export async function authMiddleware(
     await request.jwtVerify()
   } catch {
     return reply.status(401).send({
-      message: 'Unauthorized',
+      success: false,
+
+      error: {
+        message:
+          'Unauthorized',
+
+        code:
+          'UNAUTHORIZED',
+
+        statusCode: 401,
+      },
     })
   }
 }

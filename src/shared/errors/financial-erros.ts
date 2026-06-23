@@ -39,3 +39,31 @@ export class InvoicePaidError
     )
   }
 }
+
+// Erro para quando o usuário tenta pagar uma fatura que ainda está aberta
+export class InvoiceNotClosedError
+  extends AppError {
+  constructor(
+    message = 'Invoice must be CLOSED before payment'
+  ) {
+    super(
+      message,
+      400,
+      'INVOICE_NOT_CLOSED'
+    )
+  }
+}
+
+// Erro para quando a fatura consta como fechada, mas não há parcelas (inconsistência)
+export class NoPendingInstallmentsError
+  extends AppError {
+  constructor(
+    message = 'No pending installments found for this invoice'
+  ) {
+    super(
+      message,
+      400,
+      'NO_PENDING_INSTALLMENTS'
+    )
+  }
+}

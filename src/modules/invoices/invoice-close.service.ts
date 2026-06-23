@@ -1,10 +1,14 @@
-// src/modules/invoices/invoice-close.service.ts
-
 import { prisma } from '../../infra/database/prisma.js'
+
+import { NotFoundError }
+  from '../../shared/errors/not-found-error.js'
+
+import { ConflictError }
+  from '../../shared/errors/conflict-error.js'
 
 export class InvoiceCloseService {
   //
-  //  FECHA UMA FATURA
+  // FECHAR FATURA
   //
 
   async closeInvoice(
@@ -12,10 +16,6 @@ export class InvoiceCloseService {
     month: number,
     year: number
   ) {
-    //
-    //  BUSCA FATURA
-    //
-
     const invoice =
       await prisma.invoice.findUnique({
         where: {
@@ -32,38 +32,26 @@ export class InvoiceCloseService {
       })
 
     if (!invoice) {
-      throw new Error(
+      throw new NotFoundError(
         'Invoice not found'
       )
     }
 
-    //
-    //  FATURA JÁ FECHADA
-    //
-
     if (
       invoice.status === 'CLOSED'
     ) {
-      throw new Error(
+      throw new ConflictError(
         'Invoice already closed'
       )
     }
 
-    //
-    //  FATURA JÁ PAGA
-    //
-
     if (
       invoice.status === 'PAID'
     ) {
-      throw new Error(
+      throw new ConflictError(
         'Invoice already paid'
       )
     }
-
-    //
-    //  BUSCA PARCELAS DA COMPETÊNCIA
-    //
 
     const installments =
       await prisma.purchaseInstallment.findMany(
@@ -72,6 +60,10 @@ export class InvoiceCloseService {
             competenceMonth: month,
 
             competenceYear: year,
+
+            status: {
+              not: 'CANCELED',
+            },
 
             purchase: {
               creditCardId,
@@ -84,10 +76,6 @@ export class InvoiceCloseService {
         }
       )
 
-    //
-    //  CALCULA TOTAL FINAL
-    //
-
     const totalAmount =
       installments.reduce(
         (acc, installment) =>
@@ -95,10 +83,6 @@ export class InvoiceCloseService {
           Number(installment.amount),
         0
       )
-
-    //
-    //  FECHA FATURA
-    //
 
     const closedInvoice =
       await prisma.invoice.update({
@@ -110,145 +94,104 @@ export class InvoiceCloseService {
           status: 'CLOSED',
 
           closedAt: new Date(),
-
-          totalAmount,
         },
       })
 
-    //
-    //  RETORNO
-    //
+    return {
+      id:
+        closedInvoice.id,
+
+      creditCardId:
+        closedInvoice.creditCardId,
+
+      month:
+        closedInvoice.month,
+
+      year:
+        closedInvoice.year,
+
+      status:
+        closedInvoice.status,
+
+      totalAmount,
+
+      openedAt:
+        closedInvoice.openedAt,
+
+      closedAt:
+        closedInvoice.closedAt,
+    }
+  }
+
+  //
+  // FECHAMENTO AUTOMÁTICO
+  //
+
+  async autoCloseInvoices() {
+    const openInvoices =
+      await prisma.invoice.findMany({
+        where: {
+          status: 'OPEN',
+        },
+
+        include: {
+          creditCard: true,
+        },
+      })
+
+    const now =
+      new Date()
+
+    const closedInvoices = []
+
+    for (const invoice of openInvoices) {
+      try {
+        const closingDate =
+          new Date(
+            invoice.year,
+            invoice.month - 1,
+            invoice.creditCard.closingDay,
+            23,
+            59,
+            59
+          )
+
+        if (
+          now <= closingDate
+        ) {
+          continue
+        }
+
+        const result =
+          await this.closeInvoice(
+            invoice.creditCardId,
+            invoice.month,
+            invoice.year
+          )
+
+        closedInvoices.push(
+          result
+        )
+
+        console.log(
+          `Invoice ${invoice.month}/${invoice.year} closed`
+        )
+      } catch (error) {
+        console.error(
+          `Error closing invoice ${invoice.month}/${invoice.year}`,
+          error
+        )
+      }
+    }
 
     return {
       success: true,
 
-      message:
-        'Invoice closed successfully',
+      totalClosed:
+        closedInvoices.length,
 
-      invoice: {
-        id: closedInvoice.id,
-
-        month:
-          closedInvoice.month,
-
-        year:
-          closedInvoice.year,
-
-        status:
-          closedInvoice.status,
-
-        totalAmount: Number(
-          closedInvoice.totalAmount
-        ),
-
-        closedAt:
-          closedInvoice.closedAt,
-      },
+      invoices:
+        closedInvoices,
     }
   }
-//
-//  FECHA FATURAS VENCIDAS
-//
-
-async autoCloseInvoices() {
-  //
-  //  BUSCA FATURAS OPEN
-  //
-
-  const openInvoices =
-    await prisma.invoice.findMany({
-      where: {
-        status: 'OPEN',
-      },
-
-      include: {
-        creditCard: true,
-      },
-    })
-
-  const now = new Date()
-
-  const closedInvoices = []
-
-  //
-  //  PROCESSA CADA FATURA
-  //
-
-  for (const invoice of openInvoices) {
-    try {
-      //
-      //  DATA DE FECHAMENTO
-      //
-
-      const closingDate =
-        new Date(
-          invoice.year,
-          invoice.month - 1,
-          invoice.creditCard
-            .closingDay,
-          23,
-          59,
-          59
-        )
-
-      //
-      //  AINDA NÃO FECHOU
-      //
-
-      if (now <= closingDate) {
-        continue
-      }
-
-      //
-      //  FECHA FATURA
-      //
-
-      const closedInvoice =
-        await this.closeInvoice(
-          invoice.creditCardId,
-          invoice.month,
-          invoice.year
-        )
-
-      closedInvoices.push(
-        closedInvoice
-      )
-
-      console.log(
-        ` Invoice ${invoice.month}/${invoice.year} closed`
-      )
-    } catch (error) {
-      //
-      //  NÃO QUEBRA O LOOP
-      //
-
-      console.error(
-        ` Error closing invoice ${invoice.month}/${invoice.year}`,
-        error
-      )
-    }
-  }
-
-  //
-  //  LOG FINAL
-  //
-
-  console.log(
-    ` ${closedInvoices.length} invoices closed`
-  )
-
-  //
-  //  RETORNO
-  //
-
-  return {
-    success: true,
-
-    totalClosed:
-      closedInvoices.length,
-
-    invoices:
-      closedInvoices,
-  }
-}
 }

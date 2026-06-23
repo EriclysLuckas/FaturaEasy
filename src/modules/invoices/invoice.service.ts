@@ -1,15 +1,23 @@
 // src/modules/invoices/invoice.service.ts
 
-import { prisma } from '../../infra/database/prisma.js'
-
-import { AppError }
-  from '../../shared/errors/app-error.js'
+import { prisma }
+  from '../../infra/database/prisma.js'
 
 import { PermissionService }
   from '../permissions/permissions.service.js'
 
 import { InvoiceLifecycleService }
   from './invoice-lifecycle.service.js'
+
+import { ForbiddenError }
+  from '../../shared/errors/forbidden-error.js'
+
+import { NotFoundError }
+  from '../../shared/errors/not-found-error.js'
+
+  
+
+
 
 interface GetInvoiceInput {
   userId: string
@@ -35,7 +43,7 @@ export class InvoiceService {
     year,
   }: GetInvoiceInput) {
     //
-    //  valida permissões
+    // PERMISSÕES
     //
 
     const isOwner =
@@ -51,14 +59,13 @@ export class InvoiceService {
       )
 
     if (!isOwner && !isCardUser) {
-      throw new AppError(
-        'Access denied',
-        403
+      throw new ForbiddenError(
+        'Access denied'
       )
     }
 
     //
-    //  busca cartão
+    // CARTÃO
     //
 
     const card =
@@ -69,26 +76,21 @@ export class InvoiceService {
 
         select: {
           id: true,
-
           name: true,
-
           totalLimit: true,
-
           closingDay: true,
-
           dueDay: true,
         },
       })
 
     if (!card) {
-      throw new AppError(
-        'Card not found',
-        404
+      throw new NotFoundError(
+        'Card not found'
       )
     }
 
     //
-    //  busca parcelas da competência
+    // PARCELAS PENDENTES
     //
 
     const installments =
@@ -98,6 +100,8 @@ export class InvoiceService {
             competenceMonth: month,
 
             competenceYear: year,
+
+            status: 'PENDING',
 
             purchase: {
               creditCardId,
@@ -114,9 +118,7 @@ export class InvoiceService {
             purchase: {
               select: {
                 id: true,
-
                 description: true,
-
                 purchaseDate: true,
               },
             },
@@ -124,9 +126,7 @@ export class InvoiceService {
             user: {
               select: {
                 id: true,
-
                 name: true,
-
                 email: true,
               },
             },
@@ -138,7 +138,6 @@ export class InvoiceService {
                 purchaseDate: 'asc',
               },
             },
-
             {
               installmentNumber: 'asc',
             },
@@ -147,7 +146,7 @@ export class InvoiceService {
       )
 
     //
-    //  sem parcelas = sem invoice
+    // SEM FATURA
     //
 
     if (installments.length === 0) {
@@ -157,7 +156,6 @@ export class InvoiceService {
 
         card: {
           id: card.id,
-
           name: card.name,
         },
 
@@ -173,7 +171,7 @@ export class InvoiceService {
     }
 
     //
-    //  busca invoice persistida
+    // INVOICE
     //
 
     const invoice =
@@ -188,14 +186,13 @@ export class InvoiceService {
       })
 
     if (!invoice) {
-      throw new AppError(
-        'Invoice record not found',
-        404
+      throw new NotFoundError(
+        'Invoice record not found'
       )
     }
 
     //
-    //  calcula status REAL
+    // STATUS REAL
     //
 
     const calculatedStatus =
@@ -219,30 +216,26 @@ export class InvoiceService {
       )
 
     //
-    //  total dinâmico
+    // TOTAL
     //
 
     const total =
       installments.reduce(
         (acc, installment) =>
           acc +
-          Number(
-            installment.amount
-          ),
+          Number(installment.amount),
         0
       )
 
     //
-    //  totais por usuário
+    // TOTAIS POR USUÁRIO
     //
 
     let totalsByUser: Record<
       string,
       {
         userId: string
-
         name: string
-
         total: number
       }
     > | null = null
@@ -266,19 +259,19 @@ export class InvoiceService {
               }
             }
 
-            acc[key].total += Number(
-              installment.amount
-            )
+            acc[key].total +=
+              Number(
+                installment.amount
+              )
 
             return acc
           },
+
           {} as Record<
             string,
             {
               userId: string
-
               name: string
-
               total: number
             }
           >
@@ -286,7 +279,7 @@ export class InvoiceService {
     }
 
     //
-    //  retorno final
+    // RETORNO
     //
 
     return {
@@ -315,7 +308,8 @@ export class InvoiceService {
         closingDay:
           card.closingDay,
 
-        dueDay: card.dueDay,
+        dueDay:
+          card.dueDay,
       },
 
       competence: {
@@ -325,45 +319,47 @@ export class InvoiceService {
 
       total,
 
-      installments: installments.map(
-        (installment) => ({
-          id: installment.id,
-
-          amount: Number(
-            installment.amount
-          ),
-
-          installmentNumber:
-            installment.installmentNumber,
-
-          status:
-            installment.status,
-
-          purchase: {
+      installments:
+        installments.map(
+          (installment) => ({
             id:
-              installment.purchase.id,
+              installment.id,
 
-            description:
-              installment.purchase
-                .description,
+            amount: Number(
+              installment.amount
+            ),
 
-            purchaseDate:
-              installment.purchase
-                .purchaseDate,
-          },
+            installmentNumber:
+              installment.installmentNumber,
 
-          user: {
-            id:
-              installment.user.id,
+            status:
+              installment.status,
 
-            name:
-              installment.user.name,
+            purchase: {
+              id:
+                installment.purchase.id,
 
-            email:
-              installment.user.email,
-          },
-        })
-      ),
+              description:
+                installment.purchase
+                  .description,
+
+              purchaseDate:
+                installment.purchase
+                  .purchaseDate,
+            },
+
+            user: {
+              id:
+                installment.user.id,
+
+              name:
+                installment.user.name,
+
+              email:
+                installment.user.email,
+            },
+          })
+        ),
 
       totalsByUser,
     }
