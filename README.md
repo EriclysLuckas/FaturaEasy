@@ -276,11 +276,37 @@ Rotinas automatizadas utilizando node-cron:
 
 ---
 
-# 📚 Documentação da API
+## 📚 Documentação e Contratos da API
 
-A API possui documentação completa utilizando Swagger/OpenAPI.
+A API possui documentação interativa utilizando Swagger/OpenAPI, permitindo explorar todos os endpoints, schemas e fluxos de autenticação.
+Além da documentação automática, os contratos da API são definidos utilizando Zod, garantindo consistência entre validação, tipagem e documentação.
 
-### Swagger
+### Recursos Implementados
+
+- Documentação Swagger/OpenAPI
+- Validação de requisições com Zod
+- Schemas compartilhados entre validação e documentação
+- Padronização global de respostas de erro
+- Mensagens de validação estruturadas
+- Documentação de autenticação JWT
+
+### Exemplo de Resposta de Erro
+
+```json
+{
+  "success": false,
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Dados inválidos",
+    "details": [
+      {
+        "field": "email",
+        "message": "Formato inválido"
+      }
+    ]
+  }
+}
+```
 
 ```text
 Adicionar imagem aqui:
