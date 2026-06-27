@@ -64,304 +64,321 @@ export class InvoiceService {
       )
     }
 
-    //
-    // CARTÃO
-    //
+   //
+// CARTÃO
+//
 
-    const card =
-      await prisma.creditCard.findUnique({
-        where: {
-          id: creditCardId,
-        },
+const card =
+  await prisma.creditCard.findUnique({
+    where: {
+      id: creditCardId,
+    },
 
-        select: {
-          id: true,
-          name: true,
-          totalLimit: true,
-          closingDay: true,
-          dueDay: true,
-        },
-      })
+    select: {
+      id: true,
 
-    if (!card) {
-      throw new NotFoundError(
-        'Card not found'
-      )
-    }
+      name: true,
 
-    //
-    // PARCELAS PENDENTES
-    //
+      totalLimit: true,
 
-    const installments =
-      await prisma.purchaseInstallment.findMany(
-        {
-          where: {
-            competenceMonth: month,
+      closingDay: true,
 
-            competenceYear: year,
+      dueDay: true,
+    },
+  })
 
-            status: 'PENDING',
+if (!card) {
+  throw new NotFoundError(
+    'Card not found'
+  )
+}
 
-            purchase: {
-              creditCardId,
-            },
+//
+// FATURA
+//
 
-            ...(isOwner
-              ? {}
-              : {
-                  userId,
-                }),
-          },
-
-          include: {
-            purchase: {
-              select: {
-                id: true,
-                description: true,
-                purchaseDate: true,
-              },
-            },
-
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-
-          orderBy: [
-            {
-              purchase: {
-                purchaseDate: 'asc',
-              },
-            },
-            {
-              installmentNumber: 'asc',
-            },
-          ],
-        }
-      )
-
-    //
-    // SEM FATURA
-    //
-
-    if (installments.length === 0) {
-      return {
-        message:
-          'No invoice for this period',
-
-        card: {
-          id: card.id,
-          name: card.name,
-        },
-
-        competence: {
-          month,
-          year,
-        },
-
-        total: 0,
-
-        installments: [],
-      }
-    }
-
-    //
-    // INVOICE
-    //
-
-    const invoice =
-      await prisma.invoice.findUnique({
-        where: {
-          creditCardId_month_year: {
-            creditCardId,
-            month,
-            year,
-          },
-        },
-      })
-
-    if (!invoice) {
-      throw new NotFoundError(
-        'Invoice record not found'
-      )
-    }
-
-    //
-    // STATUS REAL
-    //
-
-    const calculatedStatus =
-      this.invoiceLifecycleService.getInvoiceStatus(
-        {
-          month:
-            invoice.month,
-
-          year:
-            invoice.year,
-
-          status:
-            invoice.status,
-
-          paidAt:
-            invoice.paidAt,
-
-          closingDay:
-            card.closingDay,
-        }
-      )
-
-    //
-    // TOTAL
-    //
-
-    const total =
-      installments.reduce(
-        (acc, installment) =>
-          acc +
-          Number(installment.amount),
-        0
-      )
-
-    //
-    // TOTAIS POR USUÁRIO
-    //
-
-    let totalsByUser: Record<
-      string,
-      {
-        userId: string
-        name: string
-        total: number
-      }
-    > | null = null
-
-    if (isOwner) {
-      totalsByUser =
-        installments.reduce(
-          (acc, installment) => {
-            const key =
-              installment.user.id
-
-            if (!acc[key]) {
-              acc[key] = {
-                userId:
-                  installment.user.id,
-
-                name:
-                  installment.user.name,
-
-                total: 0,
-              }
-            }
-
-            acc[key].total +=
-              Number(
-                installment.amount
-              )
-
-            return acc
-          },
-
-          {} as Record<
-            string,
-            {
-              userId: string
-              name: string
-              total: number
-            }
-          >
-        )
-    }
-
-    //
-    // RETORNO
-    //
-
-    return {
-      invoice: {
-        id: invoice.id,
-
-        status:
-          calculatedStatus,
-
-        closedAt:
-          invoice.closedAt,
-
-        paidAt:
-          invoice.paidAt,
-      },
-
-      card: {
-        id: card.id,
-
-        name: card.name,
-
-        totalLimit: Number(
-          card.totalLimit
-        ),
-
-        closingDay:
-          card.closingDay,
-
-        dueDay:
-          card.dueDay,
-      },
-
-      competence: {
+const invoice =
+  await prisma.invoice.findUnique({
+    where: {
+      creditCardId_month_year: {
+        creditCardId,
         month,
         year,
       },
+    },
+  })
 
+//
+// NÃO EXISTE FATURA
+//
+
+if (!invoice) {
+  return {
+    invoice: null,
+
+    card: {
+      id: card.id,
+
+      name: card.name,
+
+      totalLimit: Number(
+        card.totalLimit
+      ),
+
+      closingDay:
+        card.closingDay,
+
+      dueDay:
+        card.dueDay,
+    },
+
+    competence: {
+      month,
+      year,
+    },
+
+    total: 0,
+
+    installments: [],
+
+    totalsByUser: null,
+  }
+}
+
+//
+// PARCELAS DA COMPETÊNCIA
+//
+
+const installments =
+  await prisma.purchaseInstallment.findMany({
+    where: {
+      competenceMonth: month,
+
+      competenceYear: year,
+
+      purchase: {
+        creditCardId,
+      },
+
+      ...(isOwner
+        ? {}
+        : {
+            userId,
+          }),
+    },
+
+    include: {
+      purchase: {
+        select: {
+          id: true,
+
+          description: true,
+
+          purchaseDate: true,
+        },
+      },
+
+      user: {
+        select: {
+          id: true,
+
+          name: true,
+
+          email: true,
+        },
+      },
+    },
+
+    orderBy: [
+      {
+        purchase: {
+          purchaseDate: 'asc',
+        },
+      },
+      {
+        installmentNumber: 'asc',
+      },
+    ],
+  })
+  
+//
+// STATUS REAL
+//
+
+const calculatedStatus =
+  this.invoiceLifecycleService.getInvoiceStatus({
+    month: invoice.month,
+
+    year: invoice.year,
+
+    status: invoice.status,
+
+    paidAt: invoice.paidAt,
+
+    closingDay: card.closingDay,
+  })
+
+//
+// TOTAL DA FATURA
+//
+
+const total =
+  installments.reduce(
+    (
       total,
+      installment
+    ) =>
+      total +
+      Number(
+        installment.amount
+      ),
+    0
+  )
 
-      installments:
-        installments.map(
-          (installment) => ({
-            id:
-              installment.id,
+//
+// TOTAIS POR USUÁRIO
+//
 
-            amount: Number(
-              installment.amount
-            ),
+let totalsByUser: Record<
+  string,
+  {
+    userId: string
 
-            installmentNumber:
-              installment.installmentNumber,
+    name: string
 
-            status:
-              installment.status,
+    total: number
+  }
+> | null = null
 
-            purchase: {
-              id:
-                installment.purchase.id,
+if (isOwner) {
+  totalsByUser =
+    installments.reduce(
+      (
+        acc,
+        installment
+      ) => {
+        const key =
+          installment.user.id
 
-              description:
-                installment.purchase
-                  .description,
+        if (!acc[key]) {
+          acc[key] = {
+            userId:
+              installment.user.id,
 
-              purchaseDate:
-                installment.purchase
-                  .purchaseDate,
-            },
+            name:
+              installment.user.name,
 
-            user: {
-              id:
-                installment.user.id,
+            total: 0,
+          }
+        }
 
-              name:
-                installment.user.name,
+        acc[key].total +=
+          Number(
+            installment.amount
+          )
 
-              email:
-                installment.user.email,
-            },
-          })
+        return acc
+      },
+
+      {} as Record<
+        string,
+        {
+          userId: string
+
+          name: string
+
+          total: number
+        }
+      >
+    )
+}
+
+//
+// RETORNO
+//
+
+return {
+  invoice: {
+    id: invoice.id,
+
+    status:
+      calculatedStatus,
+
+    closedAt:
+      invoice.closedAt,
+
+    paidAt:
+      invoice.paidAt,
+  },
+
+  card: {
+    id: card.id,
+
+    name: card.name,
+
+    totalLimit: Number(
+      card.totalLimit
+    ),
+
+    closingDay:
+      card.closingDay,
+
+    dueDay:
+      card.dueDay,
+  },
+
+  competence: {
+    month,
+    year,
+  },
+
+  total,
+
+  installments:
+    installments.map(
+      (
+        installment
+      ) => ({
+        id:
+          installment.id,
+
+        amount: Number(
+          installment.amount
         ),
 
-      totalsByUser,
-    }
-  }
+        installmentNumber:
+          installment.installmentNumber,
+
+        status:
+          installment.status,
+
+        purchase: {
+          id:
+            installment.purchase.id,
+
+          description:
+            installment.purchase
+              .description,
+
+          purchaseDate:
+            installment.purchase
+              .purchaseDate,
+        },
+
+        user: {
+          id:
+            installment.user.id,
+
+          name:
+            installment.user.name,
+
+          email:
+            installment.user.email,
+        },
+      })
+    ),
+
+  totalsByUser,
+}
+}
 }

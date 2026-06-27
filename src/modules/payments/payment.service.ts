@@ -1,21 +1,17 @@
-import { prisma }
-  from '../../infra/database/prisma.js'
+// src/modules/payments/payment.service.ts
 
-import { PermissionService }
-  from '../permissions/permissions.service.js'
+import { prisma } from '../../infra/database/prisma.js'
 
-import { InvoiceLifecycleService }
-  from '../invoices/invoice-lifecycle.service.js'
+import { PermissionService } from '../permissions/permissions.service.js'
+import { InvoiceLifecycleService } from '../invoices/invoice-lifecycle.service.js'
 
-import { NotFoundError }
-  from '../../shared/errors/not-found-error.js'
-
-import { ForbiddenError }
-  from '../../shared/errors/forbidden-error.js'
+import { NotFoundError } from '../../shared/errors/not-found-error.js'
+import { ForbiddenError } from '../../shared/errors/forbidden-error.js'
 
 import {
   InvoiceNotClosedError,
   NoPendingInstallmentsError,
+  InvoicePaidError,
 } from '../../shared/errors/financial-erros.js'
 
 interface PayInvoiceInput {
@@ -34,6 +30,10 @@ export class PaymentService {
     invoiceId,
     userId,
   }: PayInvoiceInput) {
+    //
+    // BUSCA FATURA
+    //
+
     const invoice =
       await prisma.invoice.findUnique({
         where: {
@@ -57,6 +57,10 @@ export class PaymentService {
       )
     }
 
+    //
+    // SOMENTE O DONO PODE PAGAR
+    //
+
     const isOwner =
       await this.permissionService.isCardOwner(
         userId,
@@ -65,28 +69,35 @@ export class PaymentService {
 
     if (!isOwner) {
       throw new ForbiddenError(
-        'Only owner can pay invoice'
+        'Only the card owner can pay this invoice'
       )
     }
+
+    //
+    // FATURA JÁ PAGA
+    //
+
+    if (invoice.status === 'PAID') {
+      throw new InvoicePaidError()
+    }
+
+    //
+    // STATUS DINÂMICO
+    //
 
     const calculatedStatus =
       this.invoiceLifecycleService.getInvoiceStatus(
         {
-          month:
-            invoice.month,
+          month: invoice.month,
 
-          year:
-            invoice.year,
+          year: invoice.year,
 
-          status:
-            invoice.status,
+          status: invoice.status,
 
-          paidAt:
-            invoice.paidAt,
+          paidAt: invoice.paidAt,
 
           closingDay:
-            invoice.creditCard
-              .closingDay,
+            invoice.creditCard.closingDay,
         }
       )
 
@@ -96,8 +107,16 @@ export class PaymentService {
       throw new InvoiceNotClosedError()
     }
 
+    //
+    // TRANSAÇÃO
+    //
+
     return prisma.$transaction(
       async (tx) => {
+        //
+        // BUSCA PARCELAS PENDENTES
+        //
+
         const pendingInstallments =
           await tx.purchaseInstallment.findMany(
             {
@@ -108,8 +127,7 @@ export class PaymentService {
                 competenceYear:
                   invoice.year,
 
-                status:
-                  'PENDING',
+                status: 'PENDING',
 
                 purchase: {
                   creditCardId:
@@ -130,18 +148,26 @@ export class PaymentService {
           throw new NoPendingInstallmentsError()
         }
 
+        //
+        // TOTAL PAGO
+        //
+
         const totalPaid =
           pendingInstallments.reduce(
             (
-              acc,
+              total,
               installment
             ) =>
-              acc +
+              total +
               Number(
                 installment.amount
               ),
             0
           )
+
+        //
+        // MARCA PARCELAS COMO PAGAS
+        //
 
         await tx.purchaseInstallment.updateMany(
           {
@@ -163,6 +189,10 @@ export class PaymentService {
           }
         )
 
+        //
+        // ATUALIZA FATURA
+        //
+
         const updatedInvoice =
           await tx.invoice.update({
             where: {
@@ -172,17 +202,15 @@ export class PaymentService {
             data: {
               status: 'PAID',
 
-              paidAt:
-                new Date(),
+              paidAt: new Date(),
             },
           })
 
+        //
+        // RETORNO
+        //
+
         return {
-          success: true,
-
-          message:
-            'Invoice paid successfully',
-
           invoice: {
             id:
               updatedInvoice.id,

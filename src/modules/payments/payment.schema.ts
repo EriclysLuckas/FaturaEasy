@@ -8,39 +8,30 @@ export const payInvoiceParamsSchema =
       z.string().uuid(),
   })
 
-export const payInvoiceResponseSchema =
-  z.object({
-    invoice: z.object({
-      id:
-        z.string().uuid(),
+export const payInvoiceDataSchema =
+ z.object({
+  success: z.literal(true),
 
+  data: z.object({
+    invoice: z.object({
+      id: z.string().uuid(),
       status: z.enum([
         'OPEN',
         'CLOSED',
         'PAID',
       ]),
-
-      month:
-        z.number(),
-
-      year:
-        z.number(),
-
-      paidAt:
-        z.date().nullable(),
+      month: z.number(),
+      year: z.number(),
+      paidAt: z.date().nullable(),
     }),
 
     card: z.object({
-      id:
-        z.string().uuid(),
-
-      name:
-        z.string(),
+      id: z.string().uuid(),
+      name: z.string(),
     }),
 
-    totalPaid:
-      z.number(),
+    totalPaid: z.number(),
 
-    paidInstallments:
-      z.number(),
-  })
+    paidInstallments: z.number(),
+  }),
+})

@@ -1,0 +1,14 @@
+VERIFICAR A LISTAGEM DE FATURAS:
+Atualmente faturas pagas não estão sendo coletadas, visto que retornam com valor 0 e sem parcelas.
+
+comportamenteo esperado:
+Faturas pagas devem persistir com status pago.
+
+NO BANCO JÁ CONSTA ESSA INFORMAÇÃO NA REGRA DE NEGOCIO, BASTANDO ASSIM ALTERAR APENAS A FORMA DA REQUISIÇÃO.
+
+
+
+
+PASSO DOIS>
+INVESTIGAR ERRO "SEM AUTORIZAÇÃO" RETORNADO NO SWAGGER SOBRE A ROTA DE PAGAMENTO.
+NO POSTMAN A FATURA É PAGA NORMALMENTE.
