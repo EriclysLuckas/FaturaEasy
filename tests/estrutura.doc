@@ -1,0 +1,28 @@
+tests
+│
+├── unit
+│
+│   ├── purchases
+│   │      purchase.service.spec.ts
+│   │
+│   ├── invoices
+│   │      invoice.service.spec.ts
+│   │      invoice-close.service.spec.ts
+│   │      invoice-lifecycle.service.spec.ts
+│   │
+│   ├── payments
+│   │      payment.service.spec.ts
+│   │
+│   └── permissions
+│          permission.service.spec.ts
+│
+├── mocks
+│      prisma.ts
+│
+├── factories
+│      user.factory.ts
+│      card.factory.ts
+│      purchase.factory.ts
+│
+└── helpers
+       setup.ts
