@@ -371,7 +371,7 @@ Exemplo:
 
 ## 🚧 Em Desenvolvimento
 
-* Testes automatizados com Jest
+* Testes automatizados com Vitest
 * Dashboard financeiro
 * Aplicativo mobile com React Native
 
