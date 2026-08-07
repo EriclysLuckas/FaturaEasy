@@ -18,8 +18,10 @@ export const createPurchaseSchema =
         .min(1)
         .max(24),
 
-    purchaseDate:
-      z.coerce.date(),
+   purchaseDate: z
+    .coerce
+    .date()
+    .describe('AAAA-MM-DD'),
 
     creditCardId:
       z.string().uuid(),

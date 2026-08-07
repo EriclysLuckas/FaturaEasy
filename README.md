@@ -453,29 +453,3 @@ Projeto em desenvolvimento ativo e evoluindo conforme necessidades reais de uso 
 
 Novas funcionalidades serão implementadas com foco em resolver problemas reais de gestão financeira compartilhada.
 
-interface CalculateCompetenceInput {
-  purchaseDate: Date
-  closingDay: number
-}
-
-export function calculateInitialCompetence({
-  purchaseDate,
-  closingDay,
-}: CalculateCompetenceInput) {
-  let targetMonth = purchaseDate.getMonth() + 1 // getMonth() retorna 0-11
-  let targetYear = purchaseDate.getFullYear()
-
-  // Se o dia da compra for igual ou maior que o dia de fechamento, 
-  // a compra cai na fatura do próximo mês.
-  if (purchaseDate.getDate() >= closingDay) {
-    targetMonth += 1
-  }
-
-  // Tratamento para virada de ano (ex: compra em Dezembro após o fechamento)
-  if (targetMonth > 12) {
-    targetMonth = 1
-    targetYear += 1
-  }
-
-  return { month: targetMonth, year: targetYear }
-}

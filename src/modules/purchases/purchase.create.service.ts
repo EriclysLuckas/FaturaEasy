@@ -334,21 +334,21 @@ export class PurchaseCreateService {
                             },
                         })
 
-                    if (existingInvoice) {
+              
                         const invoiceStatus =
                             invoiceLifecycle.getInvoiceStatus(
                                 {
                                     month:
-                                        existingInvoice.month,
+                                        currentMonth,
 
                                     year:
-                                        existingInvoice.year,
+                                        currentYear,
 
                                     status:
-                                        existingInvoice.status,
+                                        existingInvoice?.status ?? 'OPEN',
 
                                     paidAt:
-                                        existingInvoice.paidAt,
+                                        existingInvoice?.paidAt ?? null,
 
                                     closingDay:
                                         card.closingDay,
@@ -362,7 +362,7 @@ export class PurchaseCreateService {
                         if (invoiceStatus === 'PAID') {
                             throw new InvoicePaidError(`Invoice ${currentMonth}/${currentYear} is already paid`)
                         }
-                    }
+                  
 
                     //
                     // CRIA PARCELA
