@@ -10,9 +10,9 @@ export const payInvoiceParamsSchema =
 
 export const payInvoiceDataSchema =
  z.object({
-  success: z.literal(true),
+  // success: z.literal(true),
 
-  data: z.object({
+  // data: z.object({
     invoice: z.object({
       id: z.string().uuid(),
       status: z.enum([
@@ -33,5 +33,4 @@ export const payInvoiceDataSchema =
     totalPaid: z.number(),
 
     paidInstallments: z.number(),
-  }),
-})
+  })
