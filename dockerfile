@@ -1,23 +1,25 @@
 # Usar imagem oficial do Node
-FROM node:20-alpine
+FROM node:22-slim
 
-# Diretório de trabalho dentro do container
 WORKDIR /app
 
-# Copiar arquivos de dependência primeiro (melhora cache)
+# Instalar OpenSSL necessário para o Prisma
+RUN apt-get update -y && \
+    apt-get install -y openssl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copiar arquivos de dependência primeiro
 COPY package*.json ./
 
 # Instalar dependências
 RUN npm install
 
-# Copiar o restante do projeto
+# Copiar restante do projeto
 COPY . .
 
-# Gerar client do Prisma
+# Gerar client Prisma
 RUN npx prisma generate
 
-# Expor porta da API
 EXPOSE 3333
 
-# Comando para iniciar aplicação
 CMD ["npm", "run", "dev"]
