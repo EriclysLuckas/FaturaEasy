@@ -114,34 +114,21 @@ const invoice =
 
 if (!invoice) {
   return {
-    invoice: null,
+     message: 'No invoice for this period',
 
-    card: {
-      id: card.id,
+  card: {
+    id: card.id,
+    name: card.name,
+  },
 
-      name: card.name,
+  competence: {
+    month,
+    year,
+  },
 
-      totalLimit: Number(
-        card.totalLimit
-      ),
+  total: 0,
 
-      closingDay:
-        card.closingDay,
-
-      dueDay:
-        card.dueDay,
-    },
-
-    competence: {
-      month,
-      year,
-    },
-
-    total: 0,
-
-    installments: [],
-
-    totalsByUser: null,
+  installments: [],
   }
 }
 
