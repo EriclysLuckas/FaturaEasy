@@ -308,11 +308,11 @@ Além da documentação automática, os contratos da API são definidos utilizan
 }
 ```
 
-```text
+
 
 <img src="https://github.com/EriclysLuckas/FaturaEasy/blob/main/img/swagger%20home.png?raw=true" />
 
-```
+
 
 
 
