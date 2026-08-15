@@ -317,7 +317,7 @@ docs/swagger.png
 Exemplo:
 
 ```markdown
-![Swagger](./docs/swagger.png)
+img/swagger home.png
 ```
 
 ---
