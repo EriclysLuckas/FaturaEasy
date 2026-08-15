@@ -292,24 +292,6 @@ Além da documentação automática, os contratos da API são definidos utilizan
 
 ### Exemplo de Resposta de Erro
 
-```json
-{
-  "success": false,
-  "error": {
-    "message": "Validation error",
-    "code": "VALIDATION_ERROR",
-    "statusCode": 422,
-    "fields": {
-      "email": [
-        "Invalid email address"
-      ]
-    }
-  }
-}
-```
-
-
-
 <img src="https://github.com/EriclysLuckas/FaturaEasy/blob/main/img/error.png?raw=true" />
 
 
