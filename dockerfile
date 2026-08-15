@@ -20,6 +20,8 @@ COPY . .
 # Gerar client Prisma
 RUN npx prisma generate
 
+RUN npm run build
+
 EXPOSE 3333
 
 CMD ["npm", "start"]
