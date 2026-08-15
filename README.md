@@ -325,6 +325,7 @@ https://faturaeasy-df0h.onrender.com
 Documentação interativa
 
 https://faturaeasy-df0h.onrender.com/docs
+<img src="https://github.com/EriclysLuckas/FaturaEasy/blob/main/img/swagger%20home.png?raw=true" />
 
 ### Banco de Dados
 
