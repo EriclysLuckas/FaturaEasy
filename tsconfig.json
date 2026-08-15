@@ -4,7 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
 
-    "rootDir": ".",
+    "rootDir": "./src",
     "outDir": "dist",
 
     "strict": true,
@@ -29,6 +29,7 @@
   "exclude": [
     "node_modules",
     "dist",
-    "prisma"
+    "prisma",
+    "tests"
   ]
 }
