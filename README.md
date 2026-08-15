@@ -83,10 +83,16 @@ O Fatura Easy centraliza essas informações e automatiza a gestão financeira c
 ```mermaid
 flowchart TD
 
+User --> CreditCardUser
+CreditCard --> CreditCardUser
+
 User --> Purchase
+CreditCard --> Purchase
+
 Purchase --> PurchaseInstallment
 PurchaseInstallment --> Invoice
 Invoice --> Payment
+
 Payment --> CreditLimit
 ```
 
