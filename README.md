@@ -300,6 +300,48 @@ Além da documentação automática, os contratos da API são definidos utilizan
 
 ---
 
+
+
+# 🌐 Deploy
+
+                    ┌─────────────────────┐
+                    │       Render        │
+                    │      API Node.js    │
+                    └──────────┬──────────┘
+                               │
+                               │ 
+                               ▼
+                    ┌─────────────────────┐
+                    │        Neon         │
+                    │     PostgreSQL      │
+                    └─────────────────────┘
+
+### Fatura Easy API
+
+https://faturaeasy-df0h.onrender.com
+
+### Swagger
+
+Documentação interativa
+
+https://faturaeasy-df0h.onrender.com/docs
+
+### Banco de Dados
+
+O banco de produção utiliza PostgreSQL hospedado no Neon.
+
+A aplicação se conecta ao banco através da variável de ambiente:
+
+DATABASE_URL="postgresql://..."
+
+As credenciais reais não são versionadas no repositório.
+
+
+
+---
+
+
+
 # 🛠️ Stack Utilizada
 
 ## Backend
