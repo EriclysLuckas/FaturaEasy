@@ -483,7 +483,6 @@ Durante o desenvolvimento deste projeto foram explorados:
 
 # 📌 Status do Projeto
 
-Projeto em desenvolvimento ativo e evoluindo conforme necessidades reais de uso após deploy.
-
+Projeto em desenvolvimento ativo e evoluindo conforme necessidades reais de uso após deploy completo em breve.
 Novas funcionalidades serão implementadas com foco em resolver problemas reais de gestão financeira compartilhada.
 
