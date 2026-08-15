@@ -20,7 +20,7 @@
 - ***API em Produção:** [https://faturaeasy-df0h.onrender.com](https://faturaeasy-df0h.onrender.com)
 - ***Documentação Interativa (Swagger):** [https://faturaeasy-df0h.onrender.com/docs](https://faturaeasy-df0h.onrender.com/docs)
 
-
+---
 
 
 Backend para gerenciamento de faturas compartilhadas entre múltiplos usuários, criado para resolver um problema real de organização financeira familiar.
