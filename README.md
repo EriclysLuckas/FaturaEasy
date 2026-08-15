@@ -309,16 +309,12 @@ Além da documentação automática, os contratos da API são definidos utilizan
 ```
 
 ```text
-Adicionar imagem aqui:
 
-docs/swagger.png
+
+[docs/swagger.png](https://github.com/EriclysLuckas/FaturaEasy/blob/main/img/swagger%20home.png?raw=true)
 ```
 
-Exemplo:
 
-```markdown
-img/swagger home.png
-```
 
 ---
 
