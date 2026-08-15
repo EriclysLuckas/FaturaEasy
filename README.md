@@ -296,29 +296,25 @@ Além da documentação automática, os contratos da API são definidos utilizan
 {
   "success": false,
   "error": {
+    "message": "Validation error",
     "code": "VALIDATION_ERROR",
-    "message": "Dados inválidos",
-    "details": [
-      {
-        "field": "email",
-        "message": "Formato inválido"
-      }
-    ]
+    "statusCode": 422,
+    "fields": {
+      "email": [
+        "Invalid email address"
+      ]
+    }
   }
 }
 ```
 
-```text
-Adicionar imagem aqui:
 
-docs/swagger.png
-```
 
-Exemplo:
+<img src="https://github.com/EriclysLuckas/FaturaEasy/blob/main/img/error.png?raw=true" />
 
-```markdown
-![Swagger](./docs/swagger.png)
-```
+
+
+
 
 ---
 
