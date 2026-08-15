@@ -71,7 +71,24 @@ export async function errorHandler(
       },
     })
   }
+//
+// INVALID JSON BODY
+//
 
+if (
+  'code' in error &&
+  error.code === 'FST_ERR_CTP_INVALID_JSON_BODY'
+) {
+  return reply.status(400).send({
+    success: false,
+
+    error: {
+      message: 'Invalid JSON body',
+      code: 'INVALID_JSON_BODY',
+      statusCode: 400,
+    },
+  })
+}
   //
   // APP ERROR
   //

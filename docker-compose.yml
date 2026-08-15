@@ -9,8 +9,8 @@ services:
     ports:
       - "3333:3333"
 
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@database:5432/anotei_financas
+    # environment:
+    #   DATABASE_URL: postgresql://postgres:postgres@database:5432/anotei_financas
 
     depends_on:
       - database
