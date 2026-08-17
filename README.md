@@ -1,7 +1,7 @@
 # 💳 Fatura Easy
 
 <p align="center">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:0f172a,100:2563eb&height=180&section=header&text=Fatura%20Easy&fontSize=40&fontColor=ffffff" />
+  <img src="https://raw.githubusercontent.com/EriclysLuckas/FaturaEasy/refs/heads/main/img/BANNER.png" />
 </p>
 
 <p align="center">
