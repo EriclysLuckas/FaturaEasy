@@ -72,7 +72,7 @@ app.setErrorHandler(errorHandler)
 
 await app.register(healthRoutes)
 await app.register(authRoutes)
-await app.register(userRoutes)
+//await app.register(userRoutes)
 await app.register(cardRoutes)
 await app.register(purchaseRoutes)
 await app.register(invoiceRoutes)
