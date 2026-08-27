@@ -413,6 +413,10 @@ As credenciais reais não são versionadas no repositório.
 
 ## 🔮 Futuro
 
+*Smart Receipt Capture (Leitura de Nota Fiscal):**
+  * Funcionalidade no app mobile para leitura do QR Code da NFC-e ou foto do recibo.
+  * Extração automatizada de dados (Valor, Data, Estabelecimento) utilizando Web Scraping (via QR Code) e IA (Vision).
+  * Criação de fluxo "Human-in-the-loop": a compra é extraída e entra no sistema como "Pendente", aguardando apenas um clique de aprovação do usuário, eliminando o atrito da digitação manual.
 * Audit Trail financeiro
 * Estornos de compras
 * Pagamentos parciais
