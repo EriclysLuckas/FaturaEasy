@@ -26,3 +26,130 @@ tests
 │
 └── helpers
        setup.ts
+
+
+
+Purchase spec:
+it('Deve impedir compra quando o limite global do cartão for excedido', async () => {
+    // Arrange
+    vi.spyOn(PermissionService.prototype, 'isCardUser').mockResolvedValue(true)
+    
+    vi.mocked(prisma.creditCardUser.findUnique).mockResolvedValue({
+      userId: 'user-id',
+      creditCardId: 'card-id',
+      limitGranted: 2000, // Limite individual com folga
+    } as any)
+
+    vi.mocked(prisma.creditCard.findUnique).mockResolvedValue({
+      id: 'card-id',
+      totalLimit: 5000, // Limite total do cartão
+      closingDay: 10,
+    } as any)
+
+    vi.mocked(prisma.purchaseInstallment.findMany)
+      .mockResolvedValueOnce([{ amount: 500 }] as any) // 1ª chamada: Limite individual usado
+      .mockResolvedValueOnce([{ amount: 4800 }] as any) // 2ª chamada: Limite global usado (por todos)
+
+    // Act / Assert
+    await expect(
+      service.execute({
+        userId: 'user-id',
+        creditCardId: 'card-id',
+        description: 'Supermercado',
+        amount: 300, // 4800 + 300 = 5100 (Estoura os 5000 globais)
+        purchaseDate: new Date(),
+        installments: 1,
+      })
+    ).rejects.toBeInstanceOf(LimitExceededError)
+  })
+
+--------
+
+it('Deve alocar a diferença de dízimas de centavos na última parcela', async () => {
+    // Arrange
+    vi.spyOn(PermissionService.prototype, 'isCardUser').mockResolvedValue(true)
+    
+    vi.mocked(prisma.creditCardUser.findUnique).mockResolvedValue({
+      limitGranted: 1000,
+    } as any)
+
+    vi.mocked(prisma.creditCard.findUnique).mockResolvedValue({
+      totalLimit: 5000,
+      closingDay: 10,
+    } as any)
+
+    vi.mocked(prisma.purchaseInstallment.findMany)
+      .mockResolvedValueOnce([]) 
+      .mockResolvedValueOnce([]) 
+
+    vi.mocked(prisma.purchase.create).mockResolvedValue({ id: 'purchase-id' } as any)
+
+    // Act
+    await service.execute({
+      userId: 'user-id',
+      creditCardId: 'card-id',
+      description: 'Compra Não Divisível',
+      amount: 100,
+      purchaseDate: new Date('2026-06-05'), // Antes do fechamento
+      installments: 3,
+    })
+
+    // Assert
+    expect(prisma.purchaseInstallment.create).toHaveBeenCalledTimes(3)
+    
+    // Parcela 1
+    expect(prisma.purchaseInstallment.create).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      data: expect.objectContaining({ amount: 33.33, installmentNumber: 1 })
+    }))
+    
+    // Parcela 2
+    expect(prisma.purchaseInstallment.create).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      data: expect.objectContaining({ amount: 33.33, installmentNumber: 2 })
+    }))
+    
+    // Parcela 3 (Absorve a diferença de +0.01)
+    expect(prisma.purchaseInstallment.create).toHaveBeenNthCalledWith(3, expect.objectContaining({
+      data: expect.objectContaining({ amount: 33.34, installmentNumber: 3 })
+    }))
+  })
+
+----
+
+it('Deve processar rollover de mês e ano para compras após o fechamento em dezembro', async () => {
+    // Arrange
+    vi.spyOn(PermissionService.prototype, 'isCardUser').mockResolvedValue(true)
+    vi.mocked(prisma.creditCardUser.findUnique).mockResolvedValue({ limitGranted: 1000 } as any)
+    vi.mocked(prisma.creditCard.findUnique).mockResolvedValue({
+      totalLimit: 5000,
+      closingDay: 10, // Fatura fecha dia 10
+    } as any)
+    vi.mocked(prisma.purchaseInstallment.findMany).mockResolvedValue([])
+    vi.mocked(prisma.purchase.create).mockResolvedValue({ id: 'purchase-id' } as any)
+
+    // Act
+    await service.execute({
+      userId: 'user-id',
+      creditCardId: 'card-id',
+      description: 'Presente de Natal',
+      amount: 500,
+      purchaseDate: new Date('2026-12-15'), // Dia 15, após o fechamento de Dezembro
+      installments: 2,
+    })
+
+    // Assert
+    // A primeira parcela deve pular para Janeiro (1) do ano seguinte (2027)
+    expect(prisma.purchaseInstallment.create).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      data: expect.objectContaining({ 
+        competenceMonth: 1, 
+        competenceYear: 2027 
+      })
+    }))
+
+    // A segunda parcela deve ir para Fevereiro (2) de 2027
+    expect(prisma.purchaseInstallment.create).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      data: expect.objectContaining({ 
+        competenceMonth: 2, 
+        competenceYear: 2027 
+      })
+    }))
+  })
