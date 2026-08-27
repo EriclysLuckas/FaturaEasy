@@ -1,1 +1,9 @@
+APRIMORAR TESTES: 
 
+Divisão de Parcelas e Centavos: Garantir  que R$ 100 em 3x não gere R$ 99,99 de dívida, mas sim duas de R$ 33,33 e uma de R$ 33,34.
+
+Rollover de Datas (Virada de Mês/Ano): Compras feitas após o dia de fechamento em dezembro precisam cair em janeiro do ano seguinte.
+
+Cálculo de Limites (Race Conditions e Somatórios): Verificar  se o cálculo de "limite disponível" abate corretamente as parcelas pendentes e ignora as pagas.
+
+Máquina de Estados da Fatura: Garantir que as transições OPEN -> CLOSED -> PAID Respeitar a linha do tempo (usando vi.useFakeTimers()).
