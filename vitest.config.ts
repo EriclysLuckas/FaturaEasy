@@ -1,7 +1,7 @@
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-   test: {
+  test: {
     globals: true,
 
     environment: 'node',
@@ -12,6 +12,13 @@ export default defineConfig({
 
     mockReset: true,
 
-    setupFiles: ['./tests/helpers/setup.ts'],
+    setupFiles: [
+      './tests/helpers/setup.ts',
+    ],
+
+    exclude: [
+      'node_modules/**',
+      'dist/**',
+    ],
   },
 })

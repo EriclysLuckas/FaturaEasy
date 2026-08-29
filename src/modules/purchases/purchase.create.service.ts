@@ -285,8 +285,7 @@ export class PurchaseCreateService {
                 ) {
                     let installmentAmount =
                         baseInstallment
-
-                    //
+//
                     // ÚLTIMA PARCELA
                     //
 
@@ -294,8 +293,12 @@ export class PurchaseCreateService {
                         i ===
                         data.installments - 1
                     ) {
-                        installmentAmount +=
-                            difference
+                        installmentAmount = Number(
+                            (
+                                installmentAmount +
+                                difference
+                            ).toFixed(2)
+                        )
                     }
 
                     let currentMonth =
