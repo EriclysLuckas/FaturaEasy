@@ -9,16 +9,12 @@ services:
     ports:
       - "3333:3333"
 
-    # environment:
-    #   DATABASE_URL: postgresql://postgres:postgres@database:5432/anotei_financas
-
     depends_on:
       - database
 
     volumes:
       - .:/app
       - /app/node_modules
-
 
   database:
     image: postgres:15
@@ -38,6 +34,24 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  database_test:
+    image: postgres:15
+
+    container_name: anotei_postgres_test
+
+    restart: always
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: anotei_financas_test
+
+    ports:
+      - "5433:5432"
+
+    volumes:
+      - postgres_test_data:/var/lib/postgresql/data
 
 volumes:
   postgres_data:
+  postgres_test_data:

@@ -23,8 +23,6 @@ export class PaymentService {
   private permissionService =
     new PermissionService()
 
-  private invoiceLifecycleService =
-    new InvoiceLifecycleService()
 
   async payInvoice({
     invoiceId,
@@ -85,28 +83,9 @@ export class PaymentService {
     // STATUS DINÂMICO
     //
 
-    const calculatedStatus =
-      this.invoiceLifecycleService.getInvoiceStatus(
-        {
-          month: invoice.month,
-
-          year: invoice.year,
-
-          status: invoice.status,
-
-          paidAt: invoice.paidAt,
-
-          closingDay:
-            invoice.creditCard.closingDay,
-        }
-      )
-
-    if (
-      calculatedStatus !== 'CLOSED'
-    ) {
-      throw new InvoiceNotClosedError()
-    }
-
+    if (invoice.status !== 'CLOSED') {
+  throw new InvoiceNotClosedError()
+}
     //
     // TRANSAÇÃO
     //

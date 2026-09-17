@@ -82,18 +82,18 @@ O Fatura Easy centraliza essas informações e automatiza a gestão financeira c
 
 ```mermaid
 flowchart TD
+    User --> CreditCard
+    User --> CreditCardUser
+    CreditCard --> CreditCardUser
 
-User --> CreditCardUser
-CreditCard --> CreditCardUser
+    User --> Purchase
+    CreditCard --> Purchase
 
-User --> Purchase
-CreditCard --> Purchase
+    Purchase --> PurchaseInstallment
+    PurchaseInstallment --> Invoice
 
-Purchase --> PurchaseInstallment
-PurchaseInstallment --> Invoice
-Invoice --> Payment
-
-Payment --> CreditLimit
+    Invoice --> Payment
+    Payment --> PurchaseInstallment
 ```
 
 ---
@@ -312,6 +312,44 @@ Além da documentação automática, os contratos da API são definidos utilizan
 
 
 ---
+# 🧪 Testes
+
+O projeto possui testes automatizados utilizando Vitest.
+
+## Testes unitários
+
+Cobrem regras isoladas do domínio, incluindo:
+
+- Criação de compras
+- Parcelamento
+- Cancelamento de compras
+- Permissões
+- Invoice Engine
+- Ciclo de vida das faturas
+- Fechamento de faturas
+- Pagamento de faturas
+
+## Testes de integração
+
+Os principais fluxos são executados contra um PostgreSQL de testes separado,
+validando o comportamento da aplicação de ponta a ponta.
+
+### Fluxo principal validado
+
+
+Usuário
+   ↓
+Cartão compartilhado
+   ↓
+Compra parcelada
+   ↓
+Parcelas
+   ↓
+Invoice
+   ↓
+Fechamento
+   ↓
+Pagamento 
 
 
 
@@ -351,7 +389,10 @@ DATABASE_URL="postgresql://..."
 As credenciais reais não são versionadas no repositório.
 
 
+### 🧪 Testes
 
+Os testes automatizados utilizam uma instância PostgreSQL separada do banco
+de desenvolvimento, evitando interferência entre ambientes.
 ---
 
 
@@ -400,20 +441,24 @@ As credenciais reais não são versionadas no repositório.
 * Cron Jobs financeiros
 * Swagger/OpenAPI
 * Padronização global de erros
+* Testes unitários
+* Testes de integração dos fluxos críticos
+* PostgreSQL para ambiente de testes
+* Deploy da API em produção
 
 ---
 
 ## 🚧 Em Desenvolvimento
 
-* Testes automatizados com Vitest
+* Aplicativo mobile com React Nativ
 * Dashboard financeiro
-* Aplicativo mobile com React Native
+
 
 ---
 
 ## 🔮 Futuro
 
-*Smart Receipt Capture (Leitura de Nota Fiscal):**
+* Smart Receipt Capture (Leitura de Nota Fiscal):**
   * Funcionalidade no app mobile para leitura do QR Code da NFC-e ou foto do recibo.
   * Extração automatizada de dados (Valor, Data, Estabelecimento) utilizando Web Scraping (via QR Code) e IA (Vision).
   * Criação de fluxo "Human-in-the-loop": a compra é extraída e entra no sistema como "Pendente", aguardando apenas um clique de aprovação do usuário, eliminando o atrito da digitação manual.
@@ -486,7 +531,10 @@ Durante o desenvolvimento deste projeto foram explorados:
 ---
 
 # 📌 Status do Projeto
+🚀 API hospedada em produção e documentação Swagger disponível.
 
-Projeto em desenvolvimento ativo e evoluindo conforme necessidades reais de uso após deploy completo em breve.
-Novas funcionalidades serão implementadas com foco em resolver problemas reais de gestão financeira compartilhada.
+O backend encontra-se em uma versão funcional, com os principais fluxos de
+autenticação, cartões compartilhados, compras parceladas, geração de
+faturas, fechamento e pagamento implementados e cobertos por testes.
 
+A próxima etapa do projeto é o desenvolvimento do aplicativo mobile.
