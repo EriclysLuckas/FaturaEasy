@@ -1,12 +1,14 @@
-// src/modules/payments/payment.service.ts
+import { prisma }
+  from '../../infra/database/prisma.js'
 
-import { prisma } from '../../infra/database/prisma.js'
+import { PermissionService }
+  from '../permissions/permissions.service.js'
 
-import { PermissionService } from '../permissions/permissions.service.js'
-import { InvoiceLifecycleService } from '../invoices/invoice-lifecycle.service.js'
+import { NotFoundError }
+  from '../../shared/errors/not-found-error.js'
 
-import { NotFoundError } from '../../shared/errors/not-found-error.js'
-import { ForbiddenError } from '../../shared/errors/forbidden-error.js'
+import { ForbiddenError }
+  from '../../shared/errors/forbidden-error.js'
 
 import {
   InvoiceNotClosedError,
@@ -14,12 +16,18 @@ import {
   InvoicePaidError,
 } from '../../shared/errors/financial-erros.js'
 
+import { toCents }
+  from '../../shared/utils/money.js'
+
+
 interface PayInvoiceInput {
   invoiceId: string
   userId: string
 }
 
+
 export class PaymentService {
+
   private permissionService =
     new PermissionService()
 
@@ -28,6 +36,7 @@ export class PaymentService {
     invoiceId,
     userId,
   }: PayInvoiceInput) {
+
     //
     // BUSCA FATURA
     //
@@ -49,11 +58,13 @@ export class PaymentService {
         },
       })
 
+
     if (!invoice) {
       throw new NotFoundError(
         'Invoice not found'
       )
     }
+
 
     //
     // SOMENTE O DONO PODE PAGAR
@@ -71,55 +82,64 @@ export class PaymentService {
       )
     }
 
+
     //
     // FATURA JÁ PAGA
     //
 
-    if (invoice.status === 'PAID') {
+    if (
+      invoice.status === 'PAID'
+    ) {
       throw new InvoicePaidError()
     }
 
+
     //
-    // STATUS DINÂMICO
+    // FATURA PRECISA ESTAR FECHADA
     //
 
-    if (invoice.status !== 'CLOSED') {
-  throw new InvoiceNotClosedError()
-}
+    if (
+      invoice.status !== 'CLOSED'
+    ) {
+      throw new InvoiceNotClosedError()
+    }
+
+
     //
     // TRANSAÇÃO
     //
 
     return prisma.$transaction(
       async (tx) => {
+
         //
         // BUSCA PARCELAS PENDENTES
         //
 
         const pendingInstallments =
-          await tx.purchaseInstallment.findMany(
-            {
-              where: {
-                competenceMonth:
-                  invoice.month,
+          await tx.purchaseInstallment.findMany({
+            where: {
+              competenceMonth:
+                invoice.month,
 
-                competenceYear:
-                  invoice.year,
+              competenceYear:
+                invoice.year,
 
-                status: 'PENDING',
+              status:
+                'PENDING',
 
-                purchase: {
-                  creditCardId:
-                    invoice.creditCardId,
-                },
+              purchase: {
+                creditCardId:
+                  invoice.creditCardId,
               },
+            },
 
-              select: {
-                id: true,
-                amount: true,
-              },
-            }
-          )
+            select: {
+              id: true,
+              amount: true,
+            },
+          })
+
 
         if (
           pendingInstallments.length === 0
@@ -127,46 +147,61 @@ export class PaymentService {
           throw new NoPendingInstallmentsError()
         }
 
+
         //
         // TOTAL PAGO
         //
+        // O cálculo é feito em centavos
+        // para evitar operações com
+        // números decimais.
+        //
 
-        const totalPaid =
+        const totalPaidCents =
           pendingInstallments.reduce(
             (
               total,
               installment
             ) =>
               total +
-              Number(
+              toCents(
                 installment.amount
               ),
             0
           )
 
+
+        //
+        // CONVERTE PARA O FORMATO
+        // DE RESPOSTA DA API
+        //
+
+        const totalPaid =
+          totalPaidCents / 100
+
+
         //
         // MARCA PARCELAS COMO PAGAS
         //
 
-        await tx.purchaseInstallment.updateMany(
-          {
-            where: {
-              id: {
-                in:
-                  pendingInstallments.map(
-                    (
-                      installment
-                    ) =>
-                      installment.id
-                  ),
-              },
+        await tx.purchaseInstallment.updateMany({
+          where: {
+            id: {
+              in:
+                pendingInstallments.map(
+                  (
+                    installment
+                  ) =>
+                    installment.id
+                ),
             },
+          },
 
-            data: {
-              status: 'PAID',
-            },
-          }
-        )
+          data: {
+            status:
+              'PAID',
+          },
+        })
+
 
         //
         // ATUALIZA FATURA
@@ -175,15 +210,19 @@ export class PaymentService {
         const updatedInvoice =
           await tx.invoice.update({
             where: {
-              id: invoice.id,
+              id:
+                invoice.id,
             },
 
             data: {
-              status: 'PAID',
+              status:
+                'PAID',
 
-              paidAt: new Date(),
+              paidAt:
+                new Date(),
             },
           })
+
 
         //
         // RETORNO

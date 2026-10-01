@@ -1,15 +1,25 @@
-import { prisma } from '../../infra/database/prisma.js'
+
+import {
+  Prisma,
+} from '@prisma/client'
+
+import { prisma }
+  from '../../infra/database/prisma.js'
 
 export class PermissionService {
   async isCardOwner(
     userId: string,
-    creditCardId: string
+    creditCardId: string,
+    db:
+      | Prisma.TransactionClient
+      | typeof prisma = prisma
   ) {
-    const card = await prisma.creditCard.findUnique({
-      where: {
-        id: creditCardId,
-      },
-    })
+    const card =
+      await db.creditCard.findUnique({
+        where: {
+          id: creditCardId,
+        },
+      })
 
     if (!card) {
       return false
@@ -17,20 +27,25 @@ export class PermissionService {
 
     return card.ownerId === userId
   }
-  async isCardUser(
-  userId: string,
-  creditCardId: string
-) {
-  const link =
-    await prisma.creditCardUser.findUnique({
-      where: {
-        userId_creditCardId: {
-          userId,
-          creditCardId,
-        },
-      },
-    })
 
-  return !!link
+  async isCardUser(
+    userId: string,
+    creditCardId: string,
+    db:
+      | Prisma.TransactionClient
+      | typeof prisma = prisma
+  ) {
+    const link =
+      await db.creditCardUser.findUnique({
+        where: {
+          userId_creditCardId: {
+            userId,
+            creditCardId,
+          },
+        },
+      })
+
+    return !!link
+  }
 }
-}
+

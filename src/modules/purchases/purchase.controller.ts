@@ -1,3 +1,4 @@
+
 import {
   FastifyReply,
   FastifyRequest,
@@ -12,46 +13,65 @@ import {
   listPurchasesQuerySchema,
 } from './purchase.schemas.js'
 
+
 const purchaseService =
   new PurchaseService()
 
+
 export class PurchaseController {
+
   //
   // CREATE
   //
 
-   async create(
+  async create(
     request: FastifyRequest,
     reply: FastifyReply
   ) {
+
     const body =
       createPurchaseSchema.parse(
         request.body
       )
 
+
     const purchase =
       await purchaseService.create({
+
         ...body,
 
-        userId: String(
-          request.user.sub
-        ),
+        userId:
+          String(
+            request.user.sub
+          ),
       })
+
 
     return reply
       .status(201)
       .send({
+
         success: true,
 
         data: {
+
           ...purchase,
 
-          amount: Number(
-            purchase.amount
-          ),
+          //
+          // Number() aqui é correto.
+          // É apenas conversão do
+          // Prisma.Decimal para a
+          // resposta JSON da API.
+          //
+
+          amount:
+            Number(
+              purchase.amount
+            ),
         },
       })
   }
+
 
   //
   // LIST
@@ -61,16 +81,20 @@ export class PurchaseController {
     request: FastifyRequest,
     reply: FastifyReply
   ) {
+
     const query =
       listPurchasesQuerySchema.parse(
         request.query
       )
 
+
     const purchases =
       await purchaseService.list({
-        userId: String(
-          request.user.sub
-        ),
+
+        userId:
+          String(
+            request.user.sub
+          ),
 
         creditCardId:
           query.creditCardId,
@@ -82,12 +106,16 @@ export class PurchaseController {
           query.year,
       })
 
+
     return reply.send({
+
       success: true,
 
-      data: purchases,
+      data:
+        purchases,
     })
   }
+
 
   //
   // GET BY ID
@@ -97,26 +125,35 @@ export class PurchaseController {
     request: FastifyRequest,
     reply: FastifyReply
   ) {
+
     const params =
       purchaseIdParamsSchema.parse(
         request.params
       )
 
+
     const purchase =
       await purchaseService.getById({
-        id: params.id,
 
-        userId: String(
-          request.user.sub
-        ),
+        id:
+          params.id,
+
+        userId:
+          String(
+            request.user.sub
+          ),
       })
 
+
     return reply.send({
+
       success: true,
 
-      data: purchase,
+      data:
+        purchase,
     })
   }
+
 
   //
   // CANCEL
@@ -126,24 +163,33 @@ export class PurchaseController {
     request: FastifyRequest,
     reply: FastifyReply
   ) {
+
     const params =
       purchaseIdParamsSchema.parse(
         request.params
       )
 
+
     const result =
       await purchaseService.cancel({
-        id: params.id,
 
-        userId: String(
-          request.user.sub
-        ),
+        id:
+          params.id,
+
+        userId:
+          String(
+            request.user.sub
+          ),
       })
 
+
     return reply.send({
+
       success: true,
 
-      data: result,
+      data:
+        result,
     })
   }
 }
+

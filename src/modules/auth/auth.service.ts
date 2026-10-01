@@ -29,6 +29,7 @@ export class AuthService {
   private invoiceCloseService =
     new InvoiceCloseService()
 
+
   async register(
     data: RegisterInput
   ) {
@@ -61,10 +62,19 @@ export class AuthService {
           password:
             hashedPassword,
         },
+
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          createdAt: true,
+        },
       })
 
     return user
   }
+
+
 
   async login(
     data: LoginInput

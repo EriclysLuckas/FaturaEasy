@@ -1,34 +1,41 @@
+
 import { prisma }
     from '../../infra/database/prisma.js'
 
 import { ForbiddenError }
-  from '../../shared/errors/forbidden-error.js'
+    from '../../shared/errors/forbidden-error.js'
 
 import { NotFoundError }
-  from '../../shared/errors/not-found-error.js'
-
-import { BadRequestError }
-  from '../../shared/errors/bad-request-error.js'
+    from '../../shared/errors/not-found-error.js'
 
 import { PermissionService }
     from '../permissions/permissions.service.js'
 
-
-import {
+import type {
     GetPurchaseInput,
     ListPurchasesInput,
 } from './purchase.types.js'
 
+
 const permissionService =
     new PermissionService()
 
+
 export class PurchaseQueryService {
+
     async list(
         data: ListPurchasesInput
     ) {
+
         const whereClause: any = {}
 
+
+        //
+        // VALIDA ACESSO AO CARTÃO
+        //
+
         if (data.creditCardId) {
+
             const isCardUser =
                 await permissionService.isCardUser(
                     data.userId,
@@ -45,12 +52,19 @@ export class PurchaseQueryService {
                 data.creditCardId
         }
 
+
+        //
+        // FILTRO POR COMPETÊNCIA
+        //
+
         if (
             data.month ||
             data.year
         ) {
+
             whereClause.installmentsData = {
                 some: {
+
                     ...(data.month && {
                         competenceMonth:
                             data.month,
@@ -64,11 +78,19 @@ export class PurchaseQueryService {
             }
         }
 
+
+        //
+        // BUSCA COMPRAS
+        //
+
         const purchases =
             await prisma.purchase.findMany({
-                where: whereClause,
+
+                where:
+                    whereClause,
 
                 include: {
+
                     user: {
                         select: {
                             id: true,
@@ -77,17 +99,33 @@ export class PurchaseQueryService {
                         },
                     },
 
-                    installmentsData: true,
+                    installmentsData:
+                        true,
                 },
 
                 orderBy: {
-                    purchaseDate: 'desc',
+                    purchaseDate:
+                        'desc',
                 },
             })
 
+
+        //
+        // RETORNO
+        //
+        // Number() aqui é correto.
+        //
+        // Não estamos calculando dinheiro.
+        // Estamos apenas convertendo o
+        // Prisma.Decimal para number para
+        // a resposta da API.
+        //
+
         return purchases.map(
             (purchase) => ({
-                id: purchase.id,
+
+                id:
+                    purchase.id,
 
                 description:
                     purchase.description,
@@ -115,17 +153,27 @@ export class PurchaseQueryService {
         )
     }
 
+
     async getById(
         data: GetPurchaseInput
     ) {
+
+        //
+        // BUSCA COMPRA
+        //
+
         const purchase =
             await prisma.purchase.findUnique({
+
                 where: {
-                    id: data.id,
+                    id:
+                        data.id,
                 },
 
                 include: {
-                    installmentsData: true,
+
+                    installmentsData:
+                        true,
 
                     user: {
                         select: {
@@ -144,11 +192,21 @@ export class PurchaseQueryService {
                 },
             })
 
+
+        //
+        // VALIDA EXISTÊNCIA
+        //
+
         if (!purchase) {
             throw new NotFoundError(
                 'Purchase not found'
             )
         }
+
+
+        //
+        // VALIDA ACESSO
+        //
 
         const isCardUser =
             await permissionService.isCardUser(
@@ -162,12 +220,23 @@ export class PurchaseQueryService {
             )
         }
 
+
+        //
+        // RETORNO
+        //
+
         return {
+
             id:
                 purchase.id,
 
             description:
                 purchase.description,
+
+            //
+            // Number() é apenas conversão
+            // para resposta da API.
+            //
 
             amount:
                 Number(
@@ -192,7 +261,13 @@ export class PurchaseQueryService {
             installmentsData:
                 purchase.installmentsData.map(
                     (installment) => ({
+
                         ...installment,
+
+                        //
+                        // Também é apenas conversão
+                        // para resposta da API.
+                        //
 
                         amount:
                             Number(

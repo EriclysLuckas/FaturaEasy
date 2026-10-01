@@ -72,7 +72,7 @@ export class InvoiceLifecycleService {
     const today =
       now.getDate()
 
-    if (today > closingDay) {
+    if (today >= closingDay) {
       return 'CLOSED'
     }
 

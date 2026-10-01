@@ -83,7 +83,12 @@ describe('InvoiceEngineService', () => {
 
     const result = await service.syncInvoice('card-id', 9, 2026)
 
-    expect(ensureSpy).toHaveBeenCalledWith('card-id', 9, 2026)
+   expect(ensureSpy).toHaveBeenCalledWith(
+  'card-id',
+  9,
+  2026,
+  prisma
+)
     expect(result).toEqual({ id: 'invoice-id' })
   })
 

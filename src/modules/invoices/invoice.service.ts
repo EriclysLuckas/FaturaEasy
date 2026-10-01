@@ -1,3 +1,4 @@
+
 // src/modules/invoices/invoice.service.ts
 
 import { prisma }
@@ -15,9 +16,8 @@ import { ForbiddenError }
 import { NotFoundError }
   from '../../shared/errors/not-found-error.js'
 
-
-
-
+import { toCents }
+  from '../../shared/utils/money.js'
 
 interface GetInvoiceInput {
   userId: string
@@ -118,11 +118,13 @@ export class InvoiceService {
 
         card: {
           id: card.id,
+
           name: card.name,
         },
 
         competence: {
           month,
+
           year,
         },
 
@@ -142,9 +144,11 @@ export class InvoiceService {
           competenceMonth: month,
 
           competenceYear: year,
+
           status: {
             not: 'CANCELED',
           },
+
           purchase: {
             creditCardId,
           },
@@ -152,8 +156,8 @@ export class InvoiceService {
           ...(isOwner
             ? {}
             : {
-              userId,
-            }),
+                userId,
+              }),
         },
 
         include: {
@@ -184,6 +188,7 @@ export class InvoiceService {
               purchaseDate: 'asc',
             },
           },
+
           {
             installmentNumber: 'asc',
           },
@@ -211,33 +216,37 @@ export class InvoiceService {
     // TOTAL DA FATURA
     //
 
-    const total =
+    const totalCents =
       installments.reduce(
         (
           total,
           installment
         ) =>
           total +
-          Number(
+          toCents(
             installment.amount
           ),
         0
       )
 
+    const total =
+      totalCents / 100
+
     //
     // TOTAIS POR USUÁRIO
     //
 
-    let totalsByUser: Record<
-      string,
-      {
-        userId: string
+    let totalsByUser:
+      Record<
+        string,
+        {
+          userId: string
 
-        name: string
+          name: string
 
-        total: number
-      }
-    > | null = null
+          totalCents: number
+        }
+      > | null = null
 
     if (isOwner) {
       totalsByUser =
@@ -257,12 +266,12 @@ export class InvoiceService {
                 name:
                   installment.user.name,
 
-                total: 0,
+                totalCents: 0,
               }
             }
 
-            acc[key].total +=
-              Number(
+            acc[key].totalCents +=
+              toCents(
                 installment.amount
               )
 
@@ -276,11 +285,43 @@ export class InvoiceService {
 
               name: string
 
-              total: number
+              totalCents: number
             }
           >
         )
     }
+
+    //
+    // CONVERSÃO DOS TOTAIS
+    // PARA A RESPOSTA DA API
+    //
+
+    const totalsByUserResponse =
+      totalsByUser
+        ? Object.fromEntries(
+            Object.entries(
+              totalsByUser
+            ).map(
+              ([
+                key,
+                value,
+              ]) => [
+                key,
+                {
+                  userId:
+                    value.userId,
+
+                  name:
+                    value.name,
+
+                  total:
+                    value.totalCents /
+                    100,
+                },
+              ]
+            )
+          )
+        : null
 
     //
     // RETORNO
@@ -318,6 +359,7 @@ export class InvoiceService {
 
       competence: {
         month,
+
         year,
       },
 
@@ -367,7 +409,9 @@ export class InvoiceService {
           })
         ),
 
-      totalsByUser,
+      totalsByUser:
+        totalsByUserResponse,
     }
   }
 }
+

@@ -1,4 +1,6 @@
+
 import { z } from 'zod'
+
 
 //
 // REQUESTS
@@ -6,6 +8,7 @@ import { z } from 'zod'
 
 export const createPurchaseSchema =
   z.object({
+
     description:
       z.string().min(2),
 
@@ -18,32 +21,49 @@ export const createPurchaseSchema =
         .min(1)
         .max(24),
 
-   purchaseDate: z
-    .coerce
-    .date()
-    .describe('AAAA-MM-DD'),
+    purchaseDate:
+      z
+        .coerce
+        .date()
+        .describe('AAAA-MM-DD'),
 
     creditCardId:
       z.string().uuid(),
   })
 
+
 export const purchaseIdParamsSchema =
   z.object({
+
     id:
       z.string().uuid(),
   })
 
+
 export const listPurchasesQuerySchema =
   z.object({
+
     creditCardId:
       z.string().uuid(),
 
     month:
-      z.coerce.number().optional(),
+      z.coerce
+        .number()
+        .int()
+        .min(1)
+        .max(12)
+        .optional(),
 
     year:
-      z.coerce.number().optional(),
+      z.coerce
+        .number()
+        .int()
+        .min(2000)
+        .max(2100)
+        .optional(),
   })
+
+
 
 //
 // RESPONSES
@@ -51,6 +71,7 @@ export const listPurchasesQuerySchema =
 
 export const purchaseInstallmentResponseSchema =
   z.object({
+
     id:
       z.string().uuid(),
 
@@ -73,8 +94,10 @@ export const purchaseInstallmentResponseSchema =
       z.date(),
   })
 
+
 export const purchaseResponseSchema =
   z.object({
+
     id:
       z.string().uuid(),
 
@@ -100,8 +123,10 @@ export const purchaseResponseSchema =
       z.date(),
   })
 
+
 export const purchaseDetailsResponseSchema =
   z.object({
+
     id:
       z.string().uuid(),
 
@@ -120,24 +145,28 @@ export const purchaseDetailsResponseSchema =
     createdAt:
       z.date(),
 
-    user: z.object({
-      id:
-        z.string().uuid(),
+    user:
+      z.object({
 
-      name:
-        z.string(),
+        id:
+          z.string().uuid(),
 
-      email:
-        z.string().email(),
-    }),
+        name:
+          z.string(),
 
-    creditCard: z.object({
-      id:
-        z.string().uuid(),
+        email:
+          z.string().email(),
+      }),
 
-      name:
-        z.string(),
-    }),
+    creditCard:
+      z.object({
+
+        id:
+          z.string().uuid(),
+
+        name:
+          z.string(),
+      }),
 
     installmentsData:
       z.array(
@@ -145,13 +174,17 @@ export const purchaseDetailsResponseSchema =
       ),
   })
 
+
 export const purchaseListResponseSchema =
   z.array(
     purchaseResponseSchema
   )
 
+
 export const cancelPurchaseResponseSchema =
   z.object({
+
     message:
       z.string(),
   })
+

@@ -1,3 +1,4 @@
+
 // src/modules/cards/card.service.ts
 
 import { prisma } from '../../infra/database/prisma.js'
@@ -14,8 +15,16 @@ import { NotFoundError }
 import { ConflictError }
   from '../../shared/errors/conflict-error.js'
 
+import { toCents }
+  from '../../shared/utils/money.js'
+
+import { CreditCardLock }
+  from '../../infra/database/locks/credit-card.lock.js'
+
+
 const permissionService =
   new PermissionService()
+
 
 interface CreateCreditCardInput {
   name: string
@@ -25,6 +34,7 @@ interface CreateCreditCardInput {
   ownerId: string
 }
 
+
 interface AddUserToCardInput {
   ownerId: string
   creditCardId: string
@@ -32,10 +42,12 @@ interface AddUserToCardInput {
   limitGranted: number
 }
 
+
 interface GetCardInput {
   userId: string
   creditCardId: string
 }
+
 
 interface UpdateCardInput {
   ownerId: string
@@ -47,237 +59,337 @@ interface UpdateCardInput {
   dueDay?: number
 }
 
+
 interface GetCardUsersInput {
   requesterId: string
   creditCardId: string
 }
 
+
+const creditCardLock =
+  new CreditCardLock()
+
+
 export class CardService {
+
   //
   // CRIAR CARTÃO
   //
 
- async create(
-  data: CreateCreditCardInput
-) {
-  return prisma.$transaction(
-    async (tx) => {
-      const card =
-        await tx.creditCard.create({
+  async create(
+    data: CreateCreditCardInput
+  ) {
+
+    return prisma.$transaction(
+      async (tx) => {
+
+        const card =
+          await tx.creditCard.create({
+            data: {
+              name:
+                data.name,
+
+              totalLimit:
+                data.totalLimit,
+
+              closingDay:
+                data.closingDay,
+
+              dueDay:
+                data.dueDay,
+
+              ownerId:
+                data.ownerId,
+            },
+          })
+
+
+        await tx.creditCardUser.create({
           data: {
-            name: data.name,
 
-            totalLimit:
-              data.totalLimit,
-
-            closingDay:
-              data.closingDay,
-
-            dueDay:
-              data.dueDay,
-
-            ownerId:
+            userId:
               data.ownerId,
+
+            creditCardId:
+              card.id,
+
+            limitGranted:
+              data.totalLimit,
           },
         })
 
-      await tx.creditCardUser.create({
-        data: {
-          userId:
-            data.ownerId,
 
-          creditCardId:
+        return {
+          id:
             card.id,
 
-          limitGranted:
-            data.totalLimit,
-        },
-      })
+          name:
+            card.name,
 
-      return {
-        id:
-          card.id,
+          totalLimit:
+            Number(
+              card.totalLimit
+            ),
 
-        name:
-          card.name,
+          closingDay:
+            card.closingDay,
 
-        totalLimit: Number(
-          card.totalLimit
-        ),
+          dueDay:
+            card.dueDay,
 
-        closingDay:
-          card.closingDay,
-
-        dueDay:
-          card.dueDay,
-
-        ownerId:
-          card.ownerId,
+          ownerId:
+            card.ownerId,
+        }
       }
-    }
-  )
-}
+    )
+  }
+
 
   //
   // ADICIONAR USUÁRIO
   //
 
-async addUserToCard(
-  data: AddUserToCardInput
-) {
-  const isOwner =
-    await permissionService.isCardOwner(
-      data.ownerId,
-      data.creditCardId
-    )
 
-  if (!isOwner) {
-    throw new ForbiddenError(
-      'Only owner can add users'
-    )
-  }
+  async addUserToCard(
+    data: AddUserToCardInput
+  ) {
+    const isOwner =
+      await permissionService.isCardOwner(
+        data.ownerId,
+        data.creditCardId
+      )
 
-  const user =
-    await prisma.user.findUnique({
-      where: {
-        email: data.userEmail,
-      },
-    })
+    if (!isOwner) {
+      throw new ForbiddenError(
+        'Only owner can add users'
+      )
+    }
 
-  if (!user) {
-    throw new NotFoundError(
-      'User not found'
-    )
-  }
+    return prisma.$transaction(
+      async (tx) => {
+        //
+        // LOCK DO CARTÃO
+        //
 
-  if (user.id === data.ownerId) {
-    throw new ConflictError(
-      'Owner already belongs to the card'
-    )
-  }
+        await creditCardLock.execute(
+          tx,
+          data.creditCardId
+        )
 
-  const existingLink =
-    await prisma.creditCardUser.findUnique(
-      {
-        where: {
-          userId_creditCardId: {
-            userId: user.id,
+        //
+        // BUSCAR CARTÃO
+        //
 
-            creditCardId:
-              data.creditCardId,
-          },
-        },
+        const card =
+          await tx.creditCard.findUnique({
+            where: {
+              id: data.creditCardId,
+            },
+          })
+
+        if (!card) {
+          throw new NotFoundError(
+            'Card not found'
+          )
+        }
+
+        //
+        // BUSCAR USUÁRIO
+        //
+
+        const user =
+          await tx.user.findUnique({
+            where: {
+              email: data.userEmail,
+            },
+          })
+
+        if (!user) {
+          throw new NotFoundError(
+            'User not found'
+          )
+        }
+
+        //
+        // OWNER NÃO PODE SER ADICIONADO
+        //
+
+        if (
+          user.id === data.ownerId
+        ) {
+          throw new ConflictError(
+            'Owner already belongs to the card'
+          )
+        }
+
+        //
+        // VERIFICAR VÍNCULO EXISTENTE
+        //
+
+        const existingLink =
+          await tx.creditCardUser.findUnique({
+            where: {
+              userId_creditCardId: {
+                userId: user.id,
+                creditCardId:
+                  data.creditCardId,
+              },
+            },
+          })
+
+        if (existingLink) {
+          throw new ConflictError(
+            'User already linked to this card'
+          )
+        }
+
+        //
+        // VALIDAR LIMITE CONCEDIDO
+        //
+
+        const totalLimitCents =
+          toCents(card.totalLimit)
+
+        const limitGrantedCents =
+          toCents(data.limitGranted)
+
+        if (
+          limitGrantedCents >
+          totalLimitCents
+        ) {
+          throw new ConflictError(
+            'Granted limit cannot be greater than the card total limit'
+          )
+        }
+
+        //
+        // CRIAR VÍNCULO
+        //
+
+        const link =
+          await tx.creditCardUser.create({
+            data: {
+              userId: user.id,
+
+              creditCardId:
+                data.creditCardId,
+
+              limitGranted:
+                data.limitGranted,
+            },
+          })
+
+        return {
+          userId:
+            link.userId,
+
+          creditCardId:
+            link.creditCardId,
+
+          limitGranted:
+            Number(
+              link.limitGranted
+            ),
+        }
       }
     )
-
-  if (existingLink) {
-    throw new ConflictError(
-      'User already linked to this card'
-    )
   }
 
-  const link =
-    await prisma.creditCardUser.create({
-      data: {
-        userId:
-          user.id,
-
-        creditCardId:
-          data.creditCardId,
-
-        limitGranted:
-          data.limitGranted,
-      },
-    })
-
-  return {
-    userId:
-      link.userId,
-
-    creditCardId:
-      link.creditCardId,
-
-    limitGranted: Number(
-      link.limitGranted
-    ),
-  }
-}
 
   //
   // LISTAR CARTÕES
   //
 
-  async listCards(userId: string) {
-    const cards =
-      await prisma.creditCardUser.findMany(
-        {
-          where: {
-            userId,
-          },
+  async listCards(
+    userId: string
+  ) {
 
-          include: {
-            creditCard: {
-              include: {
-                users: {
-                  include: {
-                    user: {
-                      select: {
-                        id: true,
-                        name: true,
-                        email: true,
-                      },
+    const cards =
+      await prisma.creditCardUser.findMany({
+        where: {
+          userId,
+        },
+
+        include: {
+
+          creditCard: {
+
+            include: {
+
+              users: {
+
+                include: {
+
+                  user: {
+
+                    select: {
+
+                      id: true,
+
+                      name: true,
+
+                      email: true,
                     },
                   },
                 },
               },
             },
           },
-        }
-      )
+        },
+      })
 
-    return cards.map((item) => ({
-      id:
-        item.creditCard.id,
 
-      name:
-        item.creditCard.name,
+    return cards.map(
+      (item) => ({
 
-      totalLimit: Number(
-        item.creditCard.totalLimit
-      ),
+        id:
+          item.creditCard.id,
 
-      closingDay:
-        item.creditCard.closingDay,
+        name:
+          item.creditCard.name,
 
-      dueDay:
-        item.creditCard.dueDay,
+        totalLimit:
+          Number(
+            item.creditCard.totalLimit
+          ),
 
-      ownerId:
-        item.creditCard.ownerId,
+        closingDay:
+          item.creditCard.closingDay,
 
-      yourLimit: Number(
-        item.limitGranted
-      ),
+        dueDay:
+          item.creditCard.dueDay,
 
-      users:
-        item.creditCard.users.map(
-          (link) => ({
-            id:
-              link.user.id,
+        ownerId:
+          item.creditCard.ownerId,
 
-            name:
-              link.user.name,
+        yourLimit:
+          Number(
+            item.limitGranted
+          ),
 
-            email:
-              link.user.email,
+        users:
+          item.creditCard.users.map(
+            (link) => ({
 
-            limitGranted: Number(
-              link.limitGranted
-            ),
-          })
-        ),
-    }))
+              id:
+                link.user.id,
+
+              name:
+                link.user.name,
+
+              email:
+                link.user.email,
+
+              limitGranted:
+                Number(
+                  link.limitGranted
+                ),
+            })
+          ),
+      })
+    )
   }
+
 
   //
   // BUSCAR CARTÃO
@@ -286,58 +398,73 @@ async addUserToCard(
   async getCardById(
     data: GetCardInput
   ) {
+
     const isCardUser =
       await permissionService.isCardUser(
         data.userId,
         data.creditCardId
       )
 
+
     if (!isCardUser) {
+
       throw new ForbiddenError(
         'Access denied'
       )
     }
 
-    const card =
-      await prisma.creditCard.findUnique(
-        {
-          where: {
-            id:
-              data.creditCardId,
-          },
 
-          include: {
-            users: {
-              include: {
-                user: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                  },
+    const card =
+      await prisma.creditCard.findUnique({
+        where: {
+
+          id:
+            data.creditCardId,
+        },
+
+        include: {
+
+          users: {
+
+            include: {
+
+              user: {
+
+                select: {
+
+                  id: true,
+
+                  name: true,
+
+                  email: true,
                 },
               },
             },
           },
-        }
-      )
+        },
+      })
+
 
     if (!card) {
+
       throw new NotFoundError(
         'Card not found'
       )
     }
 
+
     return {
+
       id:
         card.id,
 
       name:
         card.name,
 
-      totalLimit: Number(
-        card.totalLimit
-      ),
+      totalLimit:
+        Number(
+          card.totalLimit
+        ),
 
       closingDay:
         card.closingDay,
@@ -351,6 +478,7 @@ async addUserToCard(
       users:
         card.users.map(
           (link) => ({
+
             id:
               link.user.id,
 
@@ -360,13 +488,15 @@ async addUserToCard(
             email:
               link.user.email,
 
-            limitGranted: Number(
-              link.limitGranted
-            ),
+            limitGranted:
+              Number(
+                link.limitGranted
+              ),
           })
         ),
     }
   }
+
 
   //
   // ATUALIZAR CARTÃO
@@ -375,65 +505,281 @@ async addUserToCard(
   async updateCard(
     data: UpdateCardInput
   ) {
+
     const isOwner =
       await permissionService.isCardOwner(
         data.ownerId,
         data.creditCardId
       )
 
+
     if (!isOwner) {
+
       throw new ForbiddenError(
         'Only owner can update card'
       )
     }
 
-    const card =
-      await prisma.creditCard.findUnique({
-        where: {
-          id: data.creditCardId,
-        },
-      })
 
-    if (!card) {
-      throw new NotFoundError(
-        'Card not found'
-      )
-    }
+    return prisma.$transaction(
+      async (tx) => {
 
-    const updatedCard =
-      await prisma.creditCard.update({
-        where: {
-          id: data.creditCardId,
-        },
+        //
+        // LOCK DO CARTÃO
+        //
 
-        data: {
-          name: data.name,
-          totalLimit: data.totalLimit,
-          closingDay: data.closingDay,
-          dueDay: data.dueDay,
-        },
-      })
+        await creditCardLock.execute(
+          tx,
+          data.creditCardId
+        )
 
-    return {
-      id: updatedCard.id,
 
-      name: updatedCard.name,
+        //
+        // BUSCAR CARTÃO
+        //
 
-      totalLimit: Number(
-        updatedCard.totalLimit
-      ),
+        const card =
+          await tx.creditCard.findUnique({
+            where: {
+              id:
+                data.creditCardId,
+            },
+          })
 
-      closingDay:
-        updatedCard.closingDay,
 
-      dueDay:
-        updatedCard.dueDay,
+        if (!card) {
 
-      ownerId:
-        updatedCard.ownerId,
-    }
-    
+          throw new NotFoundError(
+            'Card not found'
+          )
+        }
+
+
+        //
+        // VALIDAR NOVO LIMITE
+        //
+
+        if (
+          data.totalLimit !== undefined
+        ) {
+
+          const newLimitCents =
+            toCents(
+              data.totalLimit
+            )
+
+
+          //
+          // COMPRAS AINDA COMPROMETIDAS
+          //
+
+          const pendingInstallments =
+            await tx.purchaseInstallment.aggregate({
+
+              where: {
+
+                status:
+                  'PENDING',
+
+                purchase: {
+
+                  creditCardId:
+                    data.creditCardId,
+                },
+              },
+
+              _sum: {
+
+                amount:
+                  true,
+              },
+            })
+
+
+          const pendingAmountCents =
+            pendingInstallments
+              ._sum
+              .amount
+              ? toCents(
+                pendingInstallments
+                  ._sum
+                  .amount
+              )
+              : 0
+
+
+          if (
+            newLimitCents <
+            pendingAmountCents
+          ) {
+
+            throw new ConflictError(
+              'Total limit cannot be lower than the amount already committed'
+            )
+          }
+
+
+          //
+          // MAIOR LIMITE CONCEDIDO
+          // AOS USUÁRIOS SECUNDÁRIOS
+          //
+          // O OWNER NÃO ENTRA NESSA
+          // VALIDAÇÃO.
+          //
+          // O limite do owner acompanha
+          // o totalLimit do cartão.
+          //
+
+          const secondaryLimits =
+            await tx.creditCardUser.findMany({
+
+              where: {
+
+                creditCardId:
+                  data.creditCardId,
+
+                userId: {
+                  not:
+                    card.ownerId,
+                },
+              },
+
+              select: {
+
+                limitGranted:
+                  true,
+              },
+            })
+
+
+          const largestSecondaryLimitCents =
+            secondaryLimits.reduce(
+              (
+                largest,
+                user
+              ) => {
+
+                const limitCents =
+                  toCents(
+                    user.limitGranted
+                  )
+
+                return Math.max(
+                  largest,
+                  limitCents
+                )
+              },
+              0
+            )
+
+
+          if (
+            newLimitCents <
+            largestSecondaryLimitCents
+          ) {
+
+            throw new ConflictError(
+              'Total limit cannot be lower than a limit already granted to a secondary user'
+            )
+          }
+        }
+
+
+        //
+        // ATUALIZAR CARTÃO
+        //
+
+        const updatedCard =
+          await tx.creditCard.update({
+
+            where: {
+
+              id:
+                data.creditCardId,
+            },
+
+            data: {
+
+              name:
+                data.name,
+
+              totalLimit:
+                data.totalLimit,
+
+              closingDay:
+                data.closingDay,
+
+              dueDay:
+                data.dueDay,
+            },
+          })
+
+
+        //
+        // SINCRONIZAR LIMITE DO OWNER
+        //
+        // O CreditCardUser do owner
+        // representa o limite total que
+        // ele possui no cartão.
+        //
+
+        if (
+          data.totalLimit !== undefined
+        ) {
+
+          await tx.creditCardUser.update({
+
+            where: {
+
+              userId_creditCardId: {
+
+                userId:
+                  card.ownerId,
+
+                creditCardId:
+                  data.creditCardId,
+              },
+            },
+
+            data: {
+
+              limitGranted:
+                data.totalLimit,
+            },
+          })
+        }
+
+
+        //
+        // RESPOSTA
+        //
+
+        return {
+
+          id:
+            updatedCard.id,
+
+          name:
+            updatedCard.name,
+
+          totalLimit:
+            Number(
+              updatedCard.totalLimit
+            ),
+
+          closingDay:
+            updatedCard.closingDay,
+
+          dueDay:
+            updatedCard.dueDay,
+
+          ownerId:
+            updatedCard.ownerId,
+        }
+      }
+    )
   }
+
 
   //
   // USUÁRIOS DO CARTÃO
@@ -442,61 +788,80 @@ async addUserToCard(
   async getCardUsers(
     data: GetCardUsersInput
   ) {
+
     const hasAccess =
       await permissionService.isCardUser(
         data.requesterId,
         data.creditCardId
       )
 
+
     if (!hasAccess) {
+
       throw new ForbiddenError(
         'Access denied'
       )
     }
 
+
     const users =
-      await prisma.creditCardUser.findMany(
-        {
-          where: {
-            creditCardId:
-              data.creditCardId,
-          },
+      await prisma.creditCardUser.findMany({
 
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                createdAt: true,
-              },
+        where: {
+
+          creditCardId:
+            data.creditCardId,
+        },
+
+        include: {
+
+          user: {
+
+            select: {
+
+              id: true,
+
+              name: true,
+
+              email: true,
+
+              createdAt: true,
             },
           },
+        },
 
-          orderBy: {
-            user: {
-              name: 'asc',
-            },
+        orderBy: {
+
+          user: {
+
+            name:
+              'asc',
           },
-        }
-      )
+        },
+      })
 
-    return users.map((link) => ({
-      userId:
-        link.user.id,
 
-      name:
-        link.user.name,
+    return users.map(
+      (link) => ({
 
-      email:
-        link.user.email,
+        userId:
+          link.user.id,
 
-      limitGranted: Number(
-        link.limitGranted
-      ),
+        name:
+          link.user.name,
 
-      joinedAt:
-        link.user.createdAt,
-    }))
+        email:
+          link.user.email,
+
+        limitGranted:
+          Number(
+            link.limitGranted
+          ),
+
+        joinedAt:
+          link.user.createdAt,
+      })
+    )
   }
 }
+

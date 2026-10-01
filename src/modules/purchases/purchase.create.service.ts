@@ -1,433 +1,610 @@
 import { prisma }
-    from '../../infra/database/prisma.js'
+  from '../../infra/database/prisma.js'
 
 import { ForbiddenError }
-    from '../../shared/errors/forbidden-error.js'
+  from '../../shared/errors/forbidden-error.js'
 
 import { NotFoundError }
-    from '../../shared/errors/not-found-error.js'
-
-import { BadRequestError }
-    from '../../shared/errors/bad-request-error.js'
+  from '../../shared/errors/not-found-error.js'
 
 import {
-    LimitExceededError,
-    InvoiceClosedError,
-    InvoicePaidError,
-    
-}
-    from '../../shared/errors/financial-erros.js'
+  LimitExceededError,
+  InvoiceClosedError,
+  InvoicePaidError,
+} from '../../shared/errors/financial-erros.js'
+
+import { toCents }
+  from '../../shared/utils/money.js'
 
 import { PermissionService }
-    from '../permissions/permissions.service.js'
+  from '../permissions/permissions.service.js'
 
 import { InvoiceEngineService }
-    from '../invoices/invoice-engine.service.js'
+  from '../invoices/invoice-engine.service.js'
 
 import { InvoiceLifecycleService }
-    from '../invoices/invoice-lifecycle.service.js'
+  from '../invoices/invoice-lifecycle.service.js'
+
+import { CreditCardLock }
+  from '../../infra/database/locks/credit-card.lock.js'
 
 import type { CreatePurchaseInput }
-    from './purchase.types.js'
+  from './purchase.types.js'
+
 
 const permissionService =
-    new PermissionService()
+  new PermissionService()
 
 const invoiceEngine =
-    new InvoiceEngineService()
+  new InvoiceEngineService()
 
 const invoiceLifecycle =
-    new InvoiceLifecycleService()
+  new InvoiceLifecycleService()
+
+const creditCardLock =
+  new CreditCardLock()
+
 
 export class PurchaseCreateService {
-    async execute(
-        data: CreatePurchaseInput
-    ) {
+
+  async execute(
+    data: CreatePurchaseInput
+  ) {
+
+    return prisma.$transaction(
+      async (tx) => {
+
+        //
+        // LOCK DO CARTÃO
+        //
+
+        await creditCardLock.execute(
+          tx,
+          data.creditCardId
+        )
+
+
         //
         // VALIDA USUÁRIO DO CARTÃO
         //
 
         const isCardUser =
-            await permissionService.isCardUser(
-                data.userId,
-                data.creditCardId
-            )
+          await permissionService.isCardUser(
+            data.userId,
+            data.creditCardId,
+            tx
+          )
 
         if (!isCardUser) {
-            throw new ForbiddenError(
-                'User does not belong to this card'
-            )
+          throw new ForbiddenError(
+            'User does not belong to this card'
+          )
         }
+
 
         //
         // BUSCA VÍNCULO
         //
 
         const cardLink =
-            await prisma.creditCardUser.findUnique(
-                {
-                    where: {
-                        userId_creditCardId: {
-                            userId: data.userId,
+          await tx.creditCardUser.findUnique({
+            where: {
+              userId_creditCardId: {
+                userId:
+                  data.userId,
 
-                            creditCardId:
-                                data.creditCardId,
-                        },
-                    },
-                }
-            )
+                creditCardId:
+                  data.creditCardId,
+              },
+            },
+          })
 
         if (!cardLink) {
-            throw new NotFoundError(
-                'Card link not found'
-            )
+          throw new NotFoundError(
+            'Card link not found'
+          )
         }
+
 
         //
         // BUSCA CARTÃO
         //
 
         const card =
-            await prisma.creditCard.findUnique({
-                where: {
-                    id: data.creditCardId,
-                },
-            })
+          await tx.creditCard.findUnique({
+            where: {
+              id: data.creditCardId,
+            },
+          })
 
         if (!card) {
-            throw new NotFoundError(
-                'Card not found'
-            )
+          throw new NotFoundError(
+            'Card not found'
+          )
         }
+
+
+        //
+        // VALOR DA COMPRA EM CENTAVOS
+        //
+        // Exemplo:
+        //
+        // R$ 100,50
+        // ↓
+        // 10050 centavos
+        //
+
+        const amountCents =
+          toCents(data.amount)
+
 
         //
         // LIMITE INDIVIDUAL
         //
 
         const userPendingInstallments =
-            await prisma.purchaseInstallment.findMany(
-                {
-                    where: {
-                        userId: data.userId,
+          await tx.purchaseInstallment.findMany({
+            where: {
+              userId:
+                data.userId,
 
-                        status: 'PENDING',
+              status:
+                'PENDING',
 
-                        purchase: {
-                            creditCardId:
-                                data.creditCardId,
-                        },
-                    },
-                }
-            )
+              purchase: {
+                creditCardId:
+                  data.creditCardId,
+              },
+            },
+          })
 
-        const userUsedLimit =
-            userPendingInstallments.reduce(
-                (acc, installment) =>
-                    acc +
-                    Number(installment.amount),
-                0
-            )
 
-        const userAvailableLimit =
-            Number(cardLink.limitGranted) -
-            userUsedLimit
+        //
+        // SOMA DO LIMITE UTILIZADO
+        // EM CENTAVOS
+        //
+
+        const userUsedLimitCents =
+          userPendingInstallments.reduce(
+            (
+              acc,
+              installment
+            ) =>
+              acc +
+              toCents(
+                installment.amount
+              ),
+            0
+          )
+
+
+        //
+        // LIMITE CONCEDIDO AO USUÁRIO
+        // EM CENTAVOS
+        //
+
+        const userGrantedLimitCents =
+          toCents(
+            cardLink.limitGranted
+          )
+
+
+        //
+        // LIMITE DISPONÍVEL
+        //
+
+        const userAvailableLimitCents =
+          userGrantedLimitCents -
+          userUsedLimitCents
+
+
+        //
+        // VALIDA LIMITE INDIVIDUAL
+        //
 
         if (
-            data.amount >
-            userAvailableLimit
+          amountCents >
+          userAvailableLimitCents
         ) {
-            throw new LimitExceededError(
-                'User limit exceeded'
-            )
+          throw new LimitExceededError(
+            'User limit exceeded'
+          )
         }
+
 
         //
         // LIMITE GLOBAL
         //
 
         const cardPendingInstallments =
-            await prisma.purchaseInstallment.findMany(
-                {
-                    where: {
-                        status: 'PENDING',
+          await tx.purchaseInstallment.findMany({
+            where: {
+              status:
+                'PENDING',
 
-                        purchase: {
-                            creditCardId:
-                                data.creditCardId,
-                        },
-                    },
-                }
-            )
+              purchase: {
+                creditCardId:
+                  data.creditCardId,
+              },
+            },
+          })
 
-        const cardUsedLimit =
-            cardPendingInstallments.reduce(
-                (acc, installment) =>
-                    acc +
-                    Number(installment.amount),
-                0
-            )
-
-        const cardAvailableLimit =
-            Number(card.totalLimit) -
-            cardUsedLimit
 
         //
-        // VALIDAÇÕES
+        // SOMA DO LIMITE GLOBAL
+        // EM CENTAVOS
         //
 
+        const cardUsedLimitCents =
+          cardPendingInstallments.reduce(
+            (
+              acc,
+              installment
+            ) =>
+              acc +
+              toCents(
+                installment.amount
+              ),
+            0
+          )
 
+
+        //
+        // LIMITE TOTAL DO CARTÃO
+        // EM CENTAVOS
+        //
+
+        const cardTotalLimitCents =
+          toCents(
+            card.totalLimit
+          )
+
+
+        //
+        // LIMITE GLOBAL DISPONÍVEL
+        //
+
+        const cardAvailableLimitCents =
+          cardTotalLimitCents -
+          cardUsedLimitCents
+
+
+        //
+        // VALIDA LIMITE GLOBAL
+        //
 
         if (
-            data.amount >
-            cardAvailableLimit
+          amountCents >
+          cardAvailableLimitCents
         ) {
-            throw new LimitExceededError(
-                'Card has insufficient limit'
-            )
+          throw new LimitExceededError(
+            'Card has insufficient limit'
+          )
         }
+
 
         //
         // COMPETÊNCIA FINANCEIRA
         //
 
         const purchaseDay =
-            data.purchaseDate.getDate()
+          data.purchaseDate.getDate()
 
         let competenceMonth =
-            data.purchaseDate.getMonth() + 1
+          data.purchaseDate.getMonth() + 1
 
         let competenceYear =
-            data.purchaseDate.getFullYear()
+          data.purchaseDate.getFullYear()
+
 
         //
         // COMPRA APÓS FECHAMENTO
         //
 
         if (
-            purchaseDay > card.closingDay
+          purchaseDay >=
+          card.closingDay
         ) {
-            competenceMonth += 1
 
-            if (competenceMonth > 12) {
-                competenceMonth = 1
+          competenceMonth += 1
 
-                competenceYear += 1
-            }
+          if (
+            competenceMonth > 12
+          ) {
+
+            competenceMonth = 1
+
+            competenceYear += 1
+          }
         }
+
 
         //
         // DISTRIBUIÇÃO FINANCEIRA
         //
+        // Trabalhamos exclusivamente
+        // com centavos inteiros.
+        //
+        // Exemplo:
+        //
+        // R$ 100,00 / 3
+        //
+        // 10000 / 3
+        //
+        // 1ª = 3333
+        // 2ª = 3333
+        // 3ª = 3334
+        //
+        // Soma = 10000
+        //
 
-        const baseInstallment =
-            Math.floor(
-                (data.amount /
-                    data.installments) *
-                100
-            ) / 100
-
-        const totalBase =
-            baseInstallment *
+        const baseInstallmentCents =
+          Math.floor(
+            amountCents /
             data.installments
+          )
 
-        const difference = Number(
-            (
-                data.amount - totalBase
-            ).toFixed(2)
-        )
+        const differenceCents =
+          amountCents -
+          (
+            baseInstallmentCents *
+            data.installments
+          )
+
 
         //
-        // TRANSACTION
+        // CRIA PURCHASE
+        //
+        // O Prisma continua recebendo
+        // o valor decimal original.
         //
 
-        return prisma.$transaction(
-            async (tx) => {
-                //
-                // CRIA PURCHASE
-                //
+        const purchase =
+          await tx.purchase.create({
+            data: {
 
-                const purchase =
-                    await tx.purchase.create({
-                        data: {
-                            description:
-                                data.description,
+              description:
+                data.description,
 
-                            amount: data.amount,
+              amount:
+                data.amount,
 
-                            installments:
-                                data.installments,
+              installments:
+                data.installments,
 
-                            purchaseDate:
-                                data.purchaseDate,
+              purchaseDate:
+                data.purchaseDate,
 
-                            userId: data.userId,
+              userId:
+                data.userId,
 
-                            creditCardId:
-                                data.creditCardId,
-                        },
-                    })
+              creditCardId:
+                data.creditCardId,
+            },
+          })
 
-                //
-                // CONTROLE DE FATURAS
-                //
 
-                const processedInvoices =
-                    new Set<string>()
+        //
+        // CONTROLE DE FATURAS
+        //
 
-                //
-                // GERA PARCELAS
-                //
+        const processedInvoices =
+          new Set<string>()
 
-                for (
-                    let i = 0;
-                    i < data.installments;
-                    i++
-                ) {
-                    let installmentAmount =
-                        baseInstallment
-//
-                    // ÚLTIMA PARCELA
-                    //
 
-                    if (
-                        i ===
-                        data.installments - 1
-                    ) {
-                        installmentAmount = Number(
-                            (
-                                installmentAmount +
-                                difference
-                            ).toFixed(2)
-                        )
-                    }
+        //
+        // GERA PARCELAS
+        //
 
-                    let currentMonth =
-                        competenceMonth + i
+        for (
+          let i = 0;
+          i < data.installments;
+          i++
+        ) {
 
-                    let currentYear =
-                        competenceYear
+          //
+          // VALOR BASE DA PARCELA
+          // EM CENTAVOS
+          //
 
-                    //
-                    // ROLLOVER ANO
-                    //
+          let installmentAmountCents =
+            baseInstallmentCents
 
-                    while (currentMonth > 12) {
-                        currentMonth -= 12
 
-                        currentYear += 1
-                    }
+          //
+          // ÚLTIMA PARCELA RECEBE
+          // EVENTUAL DIFERENÇA
+          //
 
-                    //
-                    // VALIDA FATURA
-                    //
+          if (
+            i ===
+            data.installments - 1
+          ) {
 
-                    const existingInvoice =
-                        await tx.invoice.findUnique({
-                            where: {
-                                creditCardId_month_year: {
-                                    creditCardId:
-                                        data.creditCardId,
+            installmentAmountCents +=
+              differenceCents
+          }
 
-                                    month:
-                                        currentMonth,
 
-                                    year:
-                                        currentYear,
-                                },
-                            },
-                        })
+          //
+          // CONVERTE PARA VALOR DECIMAL
+          // ANTES DE PERSISTIR
+          //
 
-              
-                        const invoiceStatus =
-                            invoiceLifecycle.getInvoiceStatus(
-                                {
-                                    month:
-                                        currentMonth,
+          const installmentAmount =
+            installmentAmountCents / 100
 
-                                    year:
-                                        currentYear,
 
-                                    status:
-                                        existingInvoice?.status ?? 'OPEN',
+          //
+          // COMPETÊNCIA DA PARCELA
+          //
 
-                                    paidAt:
-                                        existingInvoice?.paidAt ?? null,
+          let currentMonth =
+            competenceMonth + i
 
-                                    closingDay:
-                                        card.closingDay,
-                                }
-                            )
+          let currentYear =
+            competenceYear
 
-                        if (invoiceStatus === 'CLOSED') {
-                            throw new InvoiceClosedError(`Invoice ${currentMonth}/${currentYear} is closed`)
-                        }
 
-                        if (invoiceStatus === 'PAID') {
-                            throw new InvoicePaidError(`Invoice ${currentMonth}/${currentYear} is already paid`)
-                        }
-                  
+          //
+          // ROLLOVER ANO
+          //
 
-                    //
-                    // CRIA PARCELA
-                    //
+          while (
+            currentMonth > 12
+          ) {
 
-                    await tx.purchaseInstallment.create(
-                        {
-                            data: {
-                                purchaseId:
-                                    purchase.id,
+            currentMonth -= 12
 
-                                userId: data.userId,
+            currentYear += 1
+          }
 
-                                installmentNumber:
-                                    i + 1,
 
-                                amount:
-                                    installmentAmount,
+          //
+          // VALIDA FATURA
+          //
 
-                                competenceMonth:
-                                    currentMonth,
+          const existingInvoice =
+            await tx.invoice.findUnique({
+              where: {
+                creditCardId_month_year: {
+                  creditCardId:
+                    data.creditCardId,
 
-                                competenceYear:
-                                    currentYear,
+                  month:
+                    currentMonth,
 
-                                status: 'PENDING',
-                            },
-                        }
-                    )
+                  year:
+                    currentYear,
+                },
+              },
+            })
 
-                    //
-                    // EVITA DUPLICIDADE
-                    //
 
-                    const invoiceKey =
-                        `${currentMonth}-${currentYear}`
+          //
+          // STATUS DA FATURA
+          //
 
-                    if (
-                        processedInvoices.has(
-                            invoiceKey
-                        )
-                    ) {
-                        continue
-                    }
+          const invoiceStatus =
+            invoiceLifecycle.getInvoiceStatus({
+              month:
+                currentMonth,
 
-                    processedInvoices.add(
-                        invoiceKey
-                    )
+              year:
+                currentYear,
 
-                    //
-                    // GARANTE INVOICE
-                    //
+              status:
+                existingInvoice?.status ??
+                'OPEN',
 
-                    await invoiceEngine.ensureInvoiceExists(
-                        data.creditCardId,
-                        currentMonth,
-                        currentYear
-                    )
-                }
+              paidAt:
+                existingInvoice?.paidAt ??
+                null,
 
-                return purchase
-            }
-        )
-    }
+              closingDay:
+                card.closingDay,
+            })
+
+
+          //
+          // FATURA FECHADA
+          //
+
+          if (
+            invoiceStatus === 'CLOSED'
+          ) {
+
+            throw new InvoiceClosedError(
+              `Invoice ${currentMonth}/${currentYear} is closed`
+            )
+          }
+
+
+          //
+          // FATURA PAGA
+          //
+
+          if (
+            invoiceStatus === 'PAID'
+          ) {
+
+            throw new InvoicePaidError(
+              `Invoice ${currentMonth}/${currentYear} is already paid`
+            )
+          }
+
+
+          //
+          // CRIA PARCELA
+          //
+
+          await tx.purchaseInstallment.create({
+            data: {
+
+              purchaseId:
+                purchase.id,
+
+              userId:
+                data.userId,
+
+              installmentNumber:
+                i + 1,
+
+              amount:
+                installmentAmount,
+
+              competenceMonth:
+                currentMonth,
+
+              competenceYear:
+                currentYear,
+
+              status:
+                'PENDING',
+            },
+          })
+
+
+          //
+          // EVITA DUPLICIDADE
+          //
+
+          const invoiceKey =
+            `${currentMonth}-${currentYear}`
+
+          if (
+            processedInvoices.has(
+              invoiceKey
+            )
+          ) {
+            continue
+          }
+
+          processedInvoices.add(
+            invoiceKey
+          )
+
+
+          //
+          // GARANTE INVOICE
+          //
+
+          await invoiceEngine.ensureInvoiceExists(
+            data.creditCardId,
+            currentMonth,
+            currentYear,
+            tx
+          )
+        }
+
+
+        //
+        // RETORNA COMPRA
+        //
+
+        return purchase
+      }
+    )
+  }
 }
+

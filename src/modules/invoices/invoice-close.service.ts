@@ -1,3 +1,4 @@
+
 import { prisma } from '../../infra/database/prisma.js'
 
 import { NotFoundError }
@@ -5,6 +6,9 @@ import { NotFoundError }
 
 import { ConflictError }
   from '../../shared/errors/conflict-error.js'
+
+import { toCents }
+  from '../../shared/utils/money.js'
 
 export class InvoiceCloseService {
   //
@@ -76,13 +80,18 @@ export class InvoiceCloseService {
         }
       )
 
-    const totalAmount =
+    const totalAmountCents =
       installments.reduce(
         (acc, installment) =>
           acc +
-          Number(installment.amount),
+          toCents(
+            installment.amount
+          ),
         0
       )
+
+    const totalAmount =
+      totalAmountCents / 100
 
     const closedInvoice =
       await prisma.invoice.update({
@@ -157,7 +166,7 @@ export class InvoiceCloseService {
           )
 
         if (
-          now <= closingDate
+          now < closingDate
         ) {
           continue
         }
@@ -195,3 +204,4 @@ export class InvoiceCloseService {
     }
   }
 }
+

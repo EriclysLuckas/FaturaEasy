@@ -1,50 +1,70 @@
+
 import { PurchaseCreateService }
-  from './purchase.create.service.js'
+    from './purchase.create.service.js'
 
 import { PurchaseQueryService }
-  from './pruchase.query.service.js'
+    from './purchase.query.service.js'
 
 import { PurchaseCancelService }
-  from './pruchase.cancel.service.js'
+    from './purchase.cancel.service.js'
 
 import type {
-  CreatePurchaseInput,
-  GetPurchaseInput,
-  CancelPurchaseInput,
-  ListPurchasesInput,
+    CreatePurchaseInput,
+    GetPurchaseInput,
+    CancelPurchaseInput,
+    ListPurchasesInput,
 } from './purchase.types.js'
 
+
 const createService =
-  new PurchaseCreateService()
+    new PurchaseCreateService()
 
 const queryService =
-  new PurchaseQueryService()
+    new PurchaseQueryService()
 
 const cancelService =
-  new PurchaseCancelService()
+    new PurchaseCancelService()
+
 
 export class PurchaseService {
-  async create(
-    data: CreatePurchaseInput
-  ) {
-    return createService.execute(data)
-  }
 
-  async list(
-    data: ListPurchasesInput
-  ) {
-    return queryService.list(data)
-  }
+    async create(
+        data: CreatePurchaseInput
+    ) {
 
-  async getById(
-    data: GetPurchaseInput
-  ) {
-    return queryService.getById(data)
-  }
+        return createService.execute(
+            data
+        )
+    }
 
-  async cancel(
-    data: CancelPurchaseInput
-  ) {
-    return cancelService.execute(data)
-  }
+
+    async list(
+        data: ListPurchasesInput
+    ) {
+
+        return queryService.list(
+            data
+        )
+    }
+
+
+    async getById(
+        data: GetPurchaseInput
+    ) {
+
+        return queryService.getById(
+            data
+        )
+    }
+
+
+    async cancel(
+        data: CancelPurchaseInput
+    ) {
+
+        return cancelService.execute(
+            data
+        )
+    }
 }
+

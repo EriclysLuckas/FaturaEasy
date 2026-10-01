@@ -1,8 +1,8 @@
+
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { PaymentService } from './payment.service.js'
 import { prisma } from '../../infra/database/prisma.js'
 import { PermissionService } from '../permissions/permissions.service.js'
-import { InvoiceLifecycleService } from '../invoices/invoice-lifecycle.service.js'
 import { NotFoundError } from '../../shared/errors/not-found-error.js'
 import { ForbiddenError } from '../../shared/errors/forbidden-error.js'
 import {
@@ -42,9 +42,16 @@ describe('PaymentService', () => {
     },
   }
 
+  const closedInvoice = {
+    ...baseInvoice,
+    status: 'CLOSED',
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
+
     service = new PaymentService()
+
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) => {
       return callback(prisma)
     })
@@ -58,7 +65,10 @@ describe('PaymentService', () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue(null)
 
     await expect(
-      service.payInvoice({ invoiceId: 'invoice-id', userId: 'user-id' })
+      service.payInvoice({
+        invoiceId: 'invoice-id',
+        userId: 'user-id',
+      })
     ).rejects.toBeInstanceOf(NotFoundError)
 
     expect(prisma.$transaction).not.toHaveBeenCalled()
@@ -70,10 +80,14 @@ describe('PaymentService', () => {
 
   it('Deve lançar ForbiddenError quando o usuário não for o dono do cartão', async () => {
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue(baseInvoice as any)
+
     vi.spyOn(PermissionService.prototype, 'isCardOwner').mockResolvedValue(false)
 
     await expect(
-      service.payInvoice({ invoiceId: 'invoice-id', userId: 'user-id' })
+      service.payInvoice({
+        invoiceId: 'invoice-id',
+        userId: 'user-id',
+      })
     ).rejects.toBeInstanceOf(ForbiddenError)
 
     expect(prisma.$transaction).not.toHaveBeenCalled()
@@ -88,44 +102,37 @@ describe('PaymentService', () => {
       ...baseInvoice,
       status: 'PAID',
     } as any)
+
     vi.spyOn(PermissionService.prototype, 'isCardOwner').mockResolvedValue(true)
-    const getInvoiceStatusSpy = vi.spyOn(
-      InvoiceLifecycleService.prototype,
-      'getInvoiceStatus'
-    )
 
     await expect(
-      service.payInvoice({ invoiceId: 'invoice-id', userId: 'user-id' })
+      service.payInvoice({
+        invoiceId: 'invoice-id',
+        userId: 'user-id',
+      })
     ).rejects.toBeInstanceOf(InvoicePaidError)
 
-    // O curto-circuito por status === 'PAID' deve acontecer ANTES de calcular o status dinâmico
-    expect(getInvoiceStatusSpy).not.toHaveBeenCalled()
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
 
   // ---------------------------------------------------------------------
-  // Fatura ainda não fechada (status calculado dinamicamente)
+  // Fatura ainda não fechada
   // ---------------------------------------------------------------------
 
-  it('Deve lançar InvoiceNotClosedError quando o status calculado não for CLOSED', async () => {
-    vi.mocked(prisma.invoice.findUnique).mockResolvedValue(baseInvoice as any)
+  it('Deve lançar InvoiceNotClosedError quando a invoice persistida não estiver CLOSED', async () => {
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
+      ...baseInvoice,
+      status: 'OPEN',
+    } as any)
+
     vi.spyOn(PermissionService.prototype, 'isCardOwner').mockResolvedValue(true)
-    const getInvoiceStatusSpy = vi
-      .spyOn(InvoiceLifecycleService.prototype, 'getInvoiceStatus')
-      .mockReturnValue('OPEN' as any)
 
     await expect(
-      service.payInvoice({ invoiceId: 'invoice-id', userId: 'user-id' })
+      service.payInvoice({
+        invoiceId: 'invoice-id',
+        userId: 'user-id',
+      })
     ).rejects.toBeInstanceOf(InvoiceNotClosedError)
-
-    // Garante que o status dinâmico foi calculado com os dados corretos da invoice + cartão
-    expect(getInvoiceStatusSpy).toHaveBeenCalledWith({
-      month: baseInvoice.month,
-      year: baseInvoice.year,
-      status: baseInvoice.status,
-      paidAt: baseInvoice.paidAt,
-      closingDay: baseInvoice.creditCard.closingDay,
-    })
 
     expect(prisma.$transaction).not.toHaveBeenCalled()
   })
@@ -135,18 +142,21 @@ describe('PaymentService', () => {
   // ---------------------------------------------------------------------
 
   it('Deve lançar NoPendingInstallmentsError quando não houver parcelas PENDING para a competência da fatura', async () => {
-    vi.mocked(prisma.invoice.findUnique).mockResolvedValue(baseInvoice as any)
-    vi.spyOn(PermissionService.prototype, 'isCardOwner').mockResolvedValue(true)
-    vi.spyOn(InvoiceLifecycleService.prototype, 'getInvoiceStatus').mockReturnValue(
-      'CLOSED' as any
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue(
+      closedInvoice as any
     )
+
+    vi.spyOn(PermissionService.prototype, 'isCardOwner').mockResolvedValue(true)
+
     vi.mocked(prisma.purchaseInstallment.findMany).mockResolvedValue([])
 
     await expect(
-      service.payInvoice({ invoiceId: 'invoice-id', userId: 'user-id' })
+      service.payInvoice({
+        invoiceId: 'invoice-id',
+        userId: 'user-id',
+      })
     ).rejects.toBeInstanceOf(NoPendingInstallmentsError)
 
-    // Chegou a abrir a transação, mas não deve ter marcado nada como pago
     expect(prisma.$transaction).toHaveBeenCalled()
     expect(prisma.purchaseInstallment.updateMany).not.toHaveBeenCalled()
     expect(prisma.invoice.update).not.toHaveBeenCalled()
@@ -157,17 +167,29 @@ describe('PaymentService', () => {
   // ---------------------------------------------------------------------
 
   it('Deve pagar a fatura: marcar parcelas pendentes como PAID, atualizar a invoice e retornar o total correto', async () => {
-    vi.mocked(prisma.invoice.findUnique).mockResolvedValue(baseInvoice as any)
-    vi.spyOn(PermissionService.prototype, 'isCardOwner').mockResolvedValue(true)
-    vi.spyOn(InvoiceLifecycleService.prototype, 'getInvoiceStatus').mockReturnValue(
-      'CLOSED' as any
+    vi.mocked(prisma.invoice.findUnique).mockResolvedValue(
+      closedInvoice as any
     )
+
+    vi.spyOn(PermissionService.prototype, 'isCardOwner').mockResolvedValue(true)
+
     vi.mocked(prisma.purchaseInstallment.findMany).mockResolvedValue([
-      { id: 'installment-1', amount: 100 },
-      { id: 'installment-2', amount: 50.5 },
+      {
+        id: 'installment-1',
+        amount: 100,
+      },
+      {
+        id: 'installment-2',
+        amount: 50.5,
+      },
     ] as any)
-    vi.mocked(prisma.purchaseInstallment.updateMany).mockResolvedValue({ count: 2 } as any)
+
+    vi.mocked(prisma.purchaseInstallment.updateMany).mockResolvedValue({
+      count: 2,
+    } as any)
+
     const fakePaidAt = new Date('2026-07-20T10:00:00')
+
     vi.mocked(prisma.invoice.update).mockResolvedValue({
       id: 'invoice-id',
       status: 'PAID',
@@ -181,7 +203,8 @@ describe('PaymentService', () => {
       userId: 'user-id',
     })
 
-    // Buscou as parcelas certas: da competência da invoice, PENDING, do cartão certo
+    // Buscou somente as parcelas da competência da invoice,
+    // ainda PENDING e pertencentes ao cartão correto.
     expect(prisma.purchaseInstallment.findMany).toHaveBeenCalledWith({
       where: {
         competenceMonth: 7,
@@ -197,7 +220,7 @@ describe('PaymentService', () => {
       },
     })
 
-    // Marcou exatamente as parcelas retornadas como PAID
+    // Marcou exatamente as parcelas encontradas como PAID.
     expect(prisma.purchaseInstallment.updateMany).toHaveBeenCalledWith({
       where: {
         id: {
@@ -209,39 +232,56 @@ describe('PaymentService', () => {
       },
     })
 
-    // Atualizou a invoice para PAID com paidAt preenchido
+    // Atualizou a invoice para PAID.
     expect(prisma.invoice.update).toHaveBeenCalledWith({
-      where: { id: 'invoice-id' },
+      where: {
+        id: 'invoice-id',
+      },
       data: expect.objectContaining({
         status: 'PAID',
         paidAt: expect.any(Date),
       }),
     })
 
-    // Total pago é a soma exata das parcelas (100 + 50.5), sem perda de precisão
+    // Total pago = 100 + 50.5
     expect(result.totalPaid).toBeCloseTo(150.5, 2)
+
     expect(result.paidInstallments).toBe(2)
+
     expect(result.invoice.status).toBe('PAID')
+
     expect(result.invoice.paidAt).toEqual(fakePaidAt)
-    expect(result.card).toEqual({ id: 'card-id', name: 'Nubank' })
+
+    expect(result.card).toEqual({
+      id: 'card-id',
+      name: 'Nubank',
+    })
   })
 
+  // ---------------------------------------------------------------------
+  // Competência da invoice
+  // ---------------------------------------------------------------------
+
   it('Deve considerar apenas as parcelas da competência (mês/ano) exata da fatura, não de outras faturas do mesmo cartão', async () => {
-    // Mesma invoice, mas agora com competência diferente para garantir que o filtro
-    // de mês/ano é o que realmente isola as parcelas certas (evita pagar parcela de outra fatura)
     vi.mocked(prisma.invoice.findUnique).mockResolvedValue({
-      ...baseInvoice,
+      ...closedInvoice,
       month: 12,
       year: 2026,
     } as any)
+
     vi.spyOn(PermissionService.prototype, 'isCardOwner').mockResolvedValue(true)
-    vi.spyOn(InvoiceLifecycleService.prototype, 'getInvoiceStatus').mockReturnValue(
-      'CLOSED' as any
-    )
+
     vi.mocked(prisma.purchaseInstallment.findMany).mockResolvedValue([
-      { id: 'installment-dec', amount: 200 },
+      {
+        id: 'installment-dec',
+        amount: 200,
+      },
     ] as any)
-    vi.mocked(prisma.purchaseInstallment.updateMany).mockResolvedValue({ count: 1 } as any)
+
+    vi.mocked(prisma.purchaseInstallment.updateMany).mockResolvedValue({
+      count: 1,
+    } as any)
+
     vi.mocked(prisma.invoice.update).mockResolvedValue({
       id: 'invoice-id',
       status: 'PAID',
@@ -250,7 +290,10 @@ describe('PaymentService', () => {
       paidAt: new Date(),
     } as any)
 
-    await service.payInvoice({ invoiceId: 'invoice-id', userId: 'user-id' })
+    await service.payInvoice({
+      invoiceId: 'invoice-id',
+      userId: 'user-id',
+    })
 
     expect(prisma.purchaseInstallment.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
