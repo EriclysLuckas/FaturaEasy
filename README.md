@@ -450,7 +450,7 @@ de desenvolvimento, evitando interferência entre ambientes.
 
 ## 🚧 Em Desenvolvimento
 
-* Aplicativo mobile com React Nativ
+* Aplicativo mobile com React Native
 * Dashboard financeiro
 
 
