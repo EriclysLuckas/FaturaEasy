@@ -23,7 +23,8 @@
 
 O frontend mobile do Fatura Easy é desenvolvido separadamente em React Native + Expo.
 
-👉 [Fatura Easy Mobile](https://github.com/SEU_USUARIO/fatura-easy-mobile](https://github.com/EriclysLuckas/FaturaEasyFront/tree/main)
+👉 [Fatura Easy Mobile](https://github.com/EriclysLuckas/FaturaEasyFront)
+
 ---
 
 
