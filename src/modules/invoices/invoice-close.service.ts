@@ -160,9 +160,9 @@ export class InvoiceCloseService {
             invoice.year,
             invoice.month - 1,
             invoice.creditCard.closingDay,
-            23,
-            59,
-            59
+            0,
+            0,
+            0
           )
 
         if (

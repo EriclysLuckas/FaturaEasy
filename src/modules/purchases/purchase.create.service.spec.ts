@@ -1087,7 +1087,7 @@ describe(
 
           purchaseDate:
             new Date(
-              '2026-12-05'
+              '2026-12-09'
             ),
 
           installments:
@@ -1116,3 +1116,42 @@ describe(
   }
 )
 
+describe(
+  'PurchaseCreateService',
+  () => {
+    let service: PurchaseCreateService
+
+    beforeEach(() => {
+      // ...
+      service = new PurchaseCreateService()
+    })
+
+    // seus testes...
+
+    it(
+      'Deve enviar a compra do próprio dia de fechamento para a próxima competência',
+      async () => {
+
+        vi.spyOn(
+          PermissionService.prototype,
+          'isCardUser'
+        ).mockResolvedValue(true)
+
+        // ...
+
+        await service.execute({
+          userId: 'user-id',
+          creditCardId: 'card-id',
+          description:
+            'Compra no dia do fechamento',
+          amount: 100,
+          purchaseDate:
+            new Date('2026-12-10'),
+          installments: 1,
+        })
+
+        // ...
+      }
+    )
+  }
+)
